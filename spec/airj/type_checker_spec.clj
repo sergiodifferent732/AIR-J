@@ -167,6 +167,76 @@
                              :invariants [1]
                              :fields [{:name 'status :type 'Int}]}]})))
 
+  (it "accepts data invariants that refer to fields as locals"
+    (let [module {:name 'example/data-invariant
+                  :imports []
+                  :exports ['make]
+                  :decls [{:op :data
+                           :name 'Response
+                           :type-params []
+                           :invariants [{:op :local :name 'valid?}]
+                           :fields [{:name 'valid? :type 'Bool}]}
+                          {:op :fn
+                           :name 'make
+                           :params []
+                           :return-type 'Response
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :construct
+                                  :type 'Response
+                                  :args [true]}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "accepts union invariants that inspect payloads via self"
+    (let [module {:name 'example/union-invariant
+                  :imports []
+                  :exports ['ok]
+                  :decls [{:op :union
+                           :name 'Response
+                           :type-params []
+                           :invariants [{:op :match
+                                         :target {:op :local :name 'self}
+                                         :cases [{:pattern {:op :union-pattern
+                                                            :name 'Ok
+                                                            :args [{:op :binder-pattern
+                                                                    :name 'value}]}
+                                                  :body {:op :local :name 'value}}
+                                                 {:pattern {:op :union-pattern
+                                                            :name 'Error
+                                                            :args []}
+                                                  :body true}]}]
+                           :variants [{:name 'Ok
+                                       :fields [{:name 'value :type 'Bool}]}
+                                      {:name 'Error
+                                       :fields []}]}
+                          {:op :fn
+                           :name 'ok
+                           :params []
+                           :return-type 'Response
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :variant
+                                  :type 'Response
+                                  :name 'Ok
+                                  :args [true]}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "rejects union invariants that refer to payload names outside a match"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Unknown local type."
+                  (sut/check-module
+                   {:name 'example/bad-union-invariant
+                    :imports []
+                    :exports []
+                    :decls [{:op :union
+                             :name 'Response
+                             :type-params []
+                             :invariants [{:op :local :name 'value}]
+                             :variants [{:name 'Ok
+                                         :fields [{:name 'value :type 'Int}]}]}]})))
+
   (it "accepts direct same-module function calls"
     (let [module {:name 'example/direct-call
                   :imports []

@@ -794,6 +794,120 @@
           (should= "Postcondition failed: main"
                    (.getMessage (.getCause e)))))))
 
+  (it "enforces failing data invariants at runtime when constructing values"
+    (let [source "(module example/data_invariants
+                    (imports)
+                    (export main)
+                    (data Counter
+                      (invariants
+                        (local valid))
+                      (field valid Bool))
+                    (fn main
+                      (params)
+                      (returns Counter)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (construct Counter false)))"]
+      (try
+        (sut/run-source! source [])
+        (should false)
+        (catch java.lang.reflect.InvocationTargetException e
+          (should (instance? IllegalStateException (.getCause e)))
+          (should= "Invariant failed: Counter"
+                   (.getMessage (.getCause e)))))))
+
+  (it "enforces failing union invariants at runtime when constructing variants"
+    (let [source "(module example/union_invariants
+                    (imports)
+                    (export main)
+                    (union Response
+                      (invariants
+                        (match
+                          (local self)
+                          (case (Ok value)
+                            (local value))
+                          (case (Error)
+                            true)))
+                      (variant Ok
+                        (field value Bool))
+                      (variant Error))
+                    (fn main
+                      (params)
+                      (returns Response)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (variant Response Ok false)))"]
+      (try
+        (sut/run-source! source [])
+        (should false)
+        (catch java.lang.reflect.InvocationTargetException e
+          (should (instance? IllegalStateException (.getCause e)))
+          (should= "Invariant failed: Response"
+                   (.getMessage (.getCause e)))))))
+
+  (it "rejects constructing imported AIR-J data types from interface-only imports"
+    (let [source "(module example/imported_counter_use
+                    (imports
+                      (airj alpha/math Counter))
+                    (export main)
+                    (fn main
+                      (params)
+                      (returns Counter)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (construct Counter 1)))"
+          interfaces {'alpha/math {:name 'alpha/math
+                                   :imports []
+                                   :exports ['Counter]
+                                   :decls [{:op :data
+                                            :name 'Counter
+                                            :type-params []
+                                            :invariants [true]
+                                            :fields [{:name 'value
+                                                      :type 'Int}]}]}}]
+      (should-throw clojure.lang.ExceptionInfo
+                    "Unknown constructed type."
+                    (sut/compile-source source {:interfaces interfaces}))))
+
+  (it "enforces imported type invariants in the defining project module"
+    (let [project-sources {'alpha/math "(module alpha/math
+                                          (imports)
+                                          (export Counter make-bad)
+                                          (data Counter
+                                            (invariants
+                                              (local valid))
+                                            (field valid Bool))
+                                          (fn make-bad
+                                            (params)
+                                            (returns Counter)
+                                            (effects ())
+                                            (requires true)
+                                            (ensures true)
+                                            (construct Counter false)))"
+                           'example/use "(module example/use
+                                           (imports
+                                             (airj alpha/math Counter make-bad))
+                                           (export main)
+                                           (fn main
+                                             (params)
+                                             (returns Int)
+                                             (effects ())
+                                             (requires true)
+                                             (ensures true)
+                                             (seq
+                                               (call (local make-bad))
+                                               1)))"}]
+      (try
+        (sut/run-project-source! project-sources 'example/use [])
+        (should false)
+        (catch java.lang.reflect.InvocationTargetException e
+          (should (instance? IllegalStateException (.getCause e)))
+          (should= "Invariant failed: Counter"
+                   (.getMessage (.getCause e)))))))
+
   (it "rejects running modules without an exported AIR-J main"
     (let [source "(module example/no-run
                     (imports)
