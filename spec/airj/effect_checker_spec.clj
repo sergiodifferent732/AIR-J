@@ -307,6 +307,51 @@
                                                   0]}]}}]}]
       (should= module (sut/check-module module))))
 
+  (it "requires explicit stdin stdout and throw effects for text I/O primitives"
+    (let [module {:name 'example/text-io
+                  :imports []
+                  :exports ['program]
+                  :decls [{:op :fn
+                           :name 'program
+                           :params []
+                           :return-type 'Int
+                           :effects ['Foreign.Throw 'Stdin.Read 'Stdout.Write]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq
+                                  :exprs [{:op :io-print
+                                           :arg {:op :string-concat
+                                                 :args [">"
+                                                        {:op :io-read-line}]}}
+                                          {:op :int-add
+                                           :args [{:op :string-length
+                                                   :arg "ab"}
+                                                  {:op :string->int
+                                                   :arg "7"}]}]}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "rejects missing effects for fallible text I/O primitives"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Effect mismatch."
+                  (sut/check-module
+                   {:name 'example/missing-text-effects
+                    :imports []
+                    :exports ['program]
+                    :decls [{:op :fn
+                             :name 'program
+                             :params []
+                             :return-type 'Int
+                             :effects ['Stdout.Write]
+                             :requires [true]
+                             :ensures [true]
+                             :body {:op :seq
+                                    :exprs [{:op :io-print
+                                             :arg {:op :string-concat
+                                                   :args [">"
+                                                          {:op :io-read-line}]}}
+                                            {:op :string->int
+                                             :arg "7"}]}}]})))
+
 (describe "expr-effects"
   (it "treats lambda creation as pure but checks the lambda body against declared effects"
     (should= #{}

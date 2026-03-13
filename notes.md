@@ -536,11 +536,19 @@ Examples of the intended category:
 - integer arithmetic
 - integer comparison
 - boolean logic
+- string conversion and basic string operations
+- explicit stdin/stdout boundary operations
 - other primitive operations only when they materially reduce agent planning and transformation cost
 
 Canonical persisted AIR-J should not add alternate branching spellings such as `when` or `unless`.
 
 If an authoring layer wants them, it may lower them to canonical `if` before persisted AIR-J is produced.
+
+Current primitive failure policy:
+- fallible primitives such as `string->int` should remain explicit and require `Foreign.Throw`
+- `io/read-line` should require `Stdin.Read` and `Foreign.Throw`
+- `io/print` and `io/println` should require `Stdout.Write`
+- pure string primitives such as concatenation and length should remain effect-free
 
 ## Recommended next step
 

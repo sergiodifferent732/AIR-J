@@ -367,6 +367,29 @@
                                                   0]}]}}]}]
       (should= module (sut/check-module module))))
 
+  (it "accepts stdin stdout string operations and fallible string conversion"
+    (let [module {:name 'example/text-io
+                  :imports []
+                  :exports ['program]
+                  :decls [{:op :fn
+                           :name 'program
+                           :params []
+                           :return-type 'Int
+                           :effects ['Foreign.Throw 'Stdin.Read 'Stdout.Write]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq
+                                  :exprs [{:op :io-print
+                                           :arg {:op :string-concat
+                                                 :args [">"
+                                                        {:op :io-read-line}]}}
+                                          {:op :int-add
+                                           :args [{:op :string-length
+                                                   :arg "ab"}
+                                                  {:op :string->int
+                                                   :arg "7"}]}]}}]}]
+      (should= module (sut/check-module module))))
+
   (it "accepts calls to imported functions from supplied interfaces"
     (let [module {:name 'example/imported-call
                   :imports [{:op :airj-import

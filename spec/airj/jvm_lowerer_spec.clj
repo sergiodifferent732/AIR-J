@@ -442,6 +442,55 @@
                    first
                    :body))))
 
+  (it "lowers stdin stdout string operations and fallible conversion into JVM plan nodes"
+    (let [module {:name 'example/text_io
+                  :imports []
+                  :exports ['program]
+                  :decls [{:op :fn
+                           :name 'program
+                           :params []
+                           :return-type 'Int
+                           :effects ['Foreign.Throw 'Stdin.Read 'Stdout.Write]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq
+                                  :exprs [{:op :io-print
+                                           :arg {:op :string-concat
+                                                 :args [">"
+                                                        {:op :io-read-line}]}}
+                                          {:op :int-add
+                                           :args [{:op :string-length
+                                                   :arg "ab"}
+                                                  {:op :string->int
+                                                   :arg "7"}]}]}}]}]
+      (should= {:op :jvm-seq
+                :exprs [{:op :jvm-io-print
+                         :arg {:op :jvm-string-concat
+                               :args [{:op :jvm-string
+                                       :value ">"
+                                       :jvm-type "java/lang/String"}
+                                      {:op :jvm-io-read-line
+                                       :jvm-type "java/lang/String"}]
+                               :jvm-type "java/lang/String"}
+                         :jvm-type :void}
+                        {:op :jvm-int-add
+                         :args [{:op :jvm-string-length
+                                 :arg {:op :jvm-string
+                                       :value "ab"
+                                       :jvm-type "java/lang/String"}
+                                 :jvm-type :int}
+                                {:op :jvm-string->int
+                                 :arg {:op :jvm-string
+                                       :value "7"
+                                       :jvm-type "java/lang/String"}
+                                 :jvm-type :int}]
+                         :jvm-type :int}]
+                :jvm-type :int}
+               (-> (sut/lower-module module)
+                   :methods
+                   first
+                   :body))))
+
   (it "lowers imported function calls to the imported module owner"
     (let [module {:name 'example/imported
                   :imports [{:op :airj-import

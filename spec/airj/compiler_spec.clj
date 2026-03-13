@@ -206,6 +206,37 @@
         (finally
           (java.lang.System/setOut original-out)))))
 
+  (it "compiles AIR-J source with stdin stdout string operations and fallible conversion"
+    (let [source "(module example/text-io
+                    (imports)
+                    (export program)
+                    (fn program
+                      (params)
+                      (returns Int)
+                      (effects (Foreign.Throw Stdin.Read Stdout.Write))
+                      (requires true)
+                      (ensures true)
+                      (seq
+                        (io/print (string-concat \">\" (io/read-line)))
+                        (int-add
+                          (string-length \"ab\")
+                          (string->int \"7\")))))"
+          bundle (sut/compile-source source)
+          klass (define-class "example.text-io" (get bundle "example/text-io"))
+          method (.getMethod klass "program" (into-array Class []))
+          out-bytes (java.io.ByteArrayOutputStream.)
+          out-stream (java.io.PrintStream. out-bytes true "UTF-8")
+          original-out (java.lang.System/out)
+          original-in (java.lang.System/in)]
+      (try
+        (java.lang.System/setOut out-stream)
+        (java.lang.System/setIn (java.io.ByteArrayInputStream. (.getBytes "abc\n" "UTF-8")))
+        (should= 9 (.invoke method nil (object-array [])))
+        (should= ">abc" (.toString out-bytes "UTF-8"))
+        (finally
+          (java.lang.System/setOut original-out)
+          (java.lang.System/setIn original-in)))))
+
   (it "writes compiled class files to disk"
     (let [source "(module example/write
                     (imports)

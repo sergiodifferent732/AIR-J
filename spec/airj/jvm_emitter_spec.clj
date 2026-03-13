@@ -393,6 +393,57 @@
         (finally
           (java.lang.System/setOut original-out)))))
 
+  (it "emits stdin stdout string operations and fallible conversion"
+    (let [plan {:op :jvm-module
+                :module-name 'example/text_io
+                :internal-name "example/text_io"
+                :exports ['program]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'program
+                           :owner "example/text_io"
+                           :params []
+                           :return-type :int
+                           :effects ['Foreign.Throw 'Stdin.Read 'Stdout.Write]
+                           :body {:op :jvm-seq
+                                  :exprs [{:op :jvm-io-print
+                                           :arg {:op :jvm-string-concat
+                                                 :args [{:op :jvm-string
+                                                         :value ">"
+                                                         :jvm-type "java/lang/String"}
+                                                        {:op :jvm-io-read-line
+                                                         :jvm-type "java/lang/String"}]
+                                                 :jvm-type "java/lang/String"}
+                                           :jvm-type :void}
+                                          {:op :jvm-int-add
+                                           :args [{:op :jvm-string-length
+                                                   :arg {:op :jvm-string
+                                                         :value "ab"
+                                                         :jvm-type "java/lang/String"}
+                                                   :jvm-type :int}
+                                                  {:op :jvm-string->int
+                                                   :arg {:op :jvm-string
+                                                         :value "7"
+                                                         :jvm-type "java/lang/String"}
+                                                   :jvm-type :int}]
+                                           :jvm-type :int}]
+                                  :jvm-type :int}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.text_io" bytes)
+          method (.getMethod klass "program" (into-array Class []))
+          out-bytes (java.io.ByteArrayOutputStream.)
+          original-out (java.lang.System/out)
+          original-in (java.lang.System/in)]
+      (try
+        (java.lang.System/setOut (java.io.PrintStream. out-bytes true "UTF-8"))
+        (java.lang.System/setIn (java.io.ByteArrayInputStream. (.getBytes "abc\n" "UTF-8")))
+        (should= 9 (.invoke method nil (object-array [])))
+        (should= ">abc" (.toString out-bytes "UTF-8"))
+        (finally
+          (java.lang.System/setOut original-out)
+          (java.lang.System/setIn original-in)))))
+
   (it "emits static Java field access"
     (let [plan {:op :jvm-module
                 :module-name 'example/java_static_field

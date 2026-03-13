@@ -453,6 +453,34 @@
                                 0]}]}
                (-> ast :decls first :body))))
 
+  (it "parses stdin stdout string and conversion primitives"
+    (let [source "(module example/text-io
+                    (imports)
+                    (export program)
+                    (fn program
+                      (params)
+                      (returns Int)
+                      (effects (Foreign.Throw Stdin.Read Stdout.Write))
+                      (requires true)
+                      (ensures true)
+                      (seq
+                        (io/print (string-concat \">\" (io/read-line)))
+                        (int-add
+                          (string-length \"ab\")
+                          (string->int \"7\")))))"
+          ast (sut/parse-module source)]
+      (should= {:op :seq
+                :exprs [{:op :io-print
+                         :arg {:op :string-concat
+                               :args [">"
+                                      {:op :io-read-line}]}}
+                        {:op :int-add
+                         :args [{:op :string-length
+                                 :arg "ab"}
+                                {:op :string->int
+                                 :arg "7"}]}]}
+               (-> ast :decls first :body))))
+
   (it "rejects when as a non-canonical persisted form"
     (should-throw clojure.lang.ExceptionInfo
                   "Unsupported expression."
