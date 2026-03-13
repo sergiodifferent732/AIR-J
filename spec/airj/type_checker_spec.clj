@@ -261,6 +261,60 @@
                                    :args [1]}}]}]
       (should= module (sut/check-module module))))
 
+  (it "accepts primitive operators with matching operand types"
+    (let [body {:op :bool-or
+                :args [{:op :bool-not
+                        :arg {:op :local :name 'flag}}
+                       {:op :bool-and
+                        :args [{:op :int-lt
+                                :args [{:op :int-add
+                                        :args [{:op :local :name 'x}
+                                               {:op :local :name 'y}]}
+                                       {:op :int-mul
+                                        :args [10
+                                               {:op :int-sub
+                                                :args [{:op :local :name 'y}
+                                                       1]}]}]}
+                               {:op :int-eq
+                                :args [{:op :int-mod
+                                        :args [{:op :local :name 'x}
+                                               2]}
+                                       {:op :int-div
+                                        :args [{:op :local :name 'y}
+                                               2]}]}]}]}
+          module {:name 'example/operators
+                  :imports []
+                  :exports ['compute]
+                  :decls [{:op :fn
+                           :name 'compute
+                           :params [{:name 'x :type 'Int}
+                                    {:name 'y :type 'Int}
+                                    {:name 'flag :type 'Bool}]
+                           :return-type 'Bool
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body body}]}]
+      (should= module (sut/check-module module))))
+
+  (it "rejects primitive operators with mismatched operand types"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Type mismatch."
+                  (sut/check-module
+                   {:name 'example/bad-operators
+                    :imports []
+                    :exports ['compute]
+                    :decls [{:op :fn
+                             :name 'compute
+                             :params [{:name 'flag :type 'Bool}]
+                             :return-type 'Int
+                             :effects []
+                             :requires [true]
+                             :ensures [true]
+                             :body {:op :int-add
+                                    :args [{:op :local :name 'flag}
+                                           1]}}]})))
+
   (it "accepts calls to imported functions from supplied interfaces"
     (let [module {:name 'example/imported-call
                   :imports [{:op :airj-import

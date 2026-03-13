@@ -245,6 +245,95 @@
                                   :jvm-type :boolean}}]}
                (sut/lower-module module))))
 
+  (it "lowers primitive operators into JVM plan nodes"
+    (let [body {:op :bool-or
+                :args [{:op :bool-not
+                        :arg {:op :local :name 'flag}}
+                       {:op :bool-and
+                        :args [{:op :int-lt
+                                :args [{:op :int-add
+                                        :args [{:op :local :name 'x}
+                                               {:op :local :name 'y}]}
+                                       {:op :int-mul
+                                        :args [10
+                                               {:op :int-sub
+                                                :args [{:op :local :name 'y}
+                                                       1]}]}]}
+                               {:op :int-eq
+                                :args [{:op :int-mod
+                                        :args [{:op :local :name 'x}
+                                               2]}
+                                       {:op :int-div
+                                        :args [{:op :local :name 'y}
+                                               2]}]}]}]}
+          module {:name 'example/operators
+                  :imports []
+                  :exports ['compute]
+                  :decls [{:op :fn
+                           :name 'compute
+                           :params [{:name 'x :type 'Int}
+                                    {:name 'y :type 'Int}
+                                    {:name 'flag :type 'Bool}]
+                           :return-type 'Bool
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body body}]}]
+      (should= {:op :jvm-bool-or
+                :args [{:op :jvm-bool-not
+                        :arg {:op :jvm-local
+                              :name 'flag
+                              :jvm-type :boolean}
+                        :jvm-type :boolean}
+                       {:op :jvm-bool-and
+                        :args [{:op :jvm-int-lt
+                                :args [{:op :jvm-int-add
+                                        :args [{:op :jvm-local
+                                                :name 'x
+                                                :jvm-type :int}
+                                               {:op :jvm-local
+                                                :name 'y
+                                                :jvm-type :int}]
+                                        :jvm-type :int}
+                                       {:op :jvm-int-mul
+                                        :args [{:op :jvm-int
+                                                :value 10
+                                                :jvm-type :int}
+                                               {:op :jvm-int-sub
+                                                :args [{:op :jvm-local
+                                                        :name 'y
+                                                        :jvm-type :int}
+                                                       {:op :jvm-int
+                                                        :value 1
+                                                        :jvm-type :int}]
+                                                :jvm-type :int}]
+                                        :jvm-type :int}]
+                                :jvm-type :boolean}
+                               {:op :jvm-int-eq
+                                :args [{:op :jvm-int-mod
+                                        :args [{:op :jvm-local
+                                                :name 'x
+                                                :jvm-type :int}
+                                               {:op :jvm-int
+                                                :value 2
+                                                :jvm-type :int}]
+                                        :jvm-type :int}
+                                       {:op :jvm-int-div
+                                        :args [{:op :jvm-local
+                                                :name 'y
+                                                :jvm-type :int}
+                                               {:op :jvm-int
+                                                :value 2
+                                                :jvm-type :int}]
+                                        :jvm-type :int}]
+                                :jvm-type :boolean}]
+                        :jvm-type :boolean}]
+                :jvm-type :boolean}
+               (-> (sut/lower-module module)
+                   :methods
+                   first
+                   :body))))
+
   (it "lowers imported function calls to the imported module owner"
     (let [module {:name 'example/imported
                   :imports [{:op :airj-import

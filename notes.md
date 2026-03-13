@@ -520,6 +520,24 @@ These decisions still need to be fixed:
 - whether effects are purely symbolic sets or may carry typed parameters later
 - whether function bodies should permit top-level metadata nodes for proofs/contracts
 
+## Primitive operator policy
+
+AIR-J should include primitive mathematical and logical operators when they reduce ambiguity, context cost, and foreign-interop churn for software agents.
+
+These operators should not be added as human-oriented surface sugar. They should exist as canonical built-ins or ordinary library functions with one persisted representation only.
+
+That means:
+- operators are justified by machine reasoning value, not human ergonomics
+- operators should be explicit, pure, and fully typed
+- persisted AIR-J should keep one canonical representation for each primitive operation
+- direct Java interop should remain available, but common agent work should not require it for basic arithmetic or boolean logic
+
+Examples of the intended category:
+- integer arithmetic
+- integer comparison
+- boolean logic
+- other primitive operations only when they materially reduce agent planning and transformation cost
+
 ## Recommended next step
 
 The next document should be a compact formal spec for version 0:

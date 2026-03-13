@@ -223,6 +223,77 @@
       (should= 1 (.invoke method nil (object-array [true])))
       (should= 0 (.invoke method nil (object-array [false])))))
 
+  (it "emits primitive arithmetic and logical operators"
+    (let [plan {:op :jvm-module
+                :module-name 'example/operators
+                :internal-name "example/operators"
+                :exports ['compute]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'compute
+                           :owner "example/operators"
+                           :params [{:name 'x :jvm-type :int}
+                                    {:name 'y :jvm-type :int}
+                                    {:name 'flag :jvm-type :boolean}]
+                           :return-type :boolean
+                           :effects []
+                           :body {:op :jvm-bool-or
+                                  :args [{:op :jvm-bool-not
+                                          :arg {:op :jvm-local
+                                                :name 'flag
+                                                :jvm-type :boolean}
+                                          :jvm-type :boolean}
+                                         {:op :jvm-bool-and
+                                          :args [{:op :jvm-int-lt
+                                                  :args [{:op :jvm-int-add
+                                                          :args [{:op :jvm-local
+                                                                  :name 'x
+                                                                  :jvm-type :int}
+                                                                 {:op :jvm-local
+                                                                  :name 'y
+                                                                  :jvm-type :int}]
+                                                          :jvm-type :int}
+                                                         {:op :jvm-int-mul
+                                                          :args [{:op :jvm-int
+                                                                  :value 10
+                                                                  :jvm-type :int}
+                                                                 {:op :jvm-int-sub
+                                                                  :args [{:op :jvm-local
+                                                                          :name 'y
+                                                                          :jvm-type :int}
+                                                                         {:op :jvm-int
+                                                                          :value 1
+                                                                          :jvm-type :int}]
+                                                                  :jvm-type :int}]
+                                                          :jvm-type :int}]
+                                                  :jvm-type :boolean}
+                                                 {:op :jvm-int-eq
+                                                  :args [{:op :jvm-int-mod
+                                                          :args [{:op :jvm-local
+                                                                  :name 'x
+                                                                  :jvm-type :int}
+                                                                 {:op :jvm-int
+                                                                  :value 2
+                                                                  :jvm-type :int}]
+                                                          :jvm-type :int}
+                                                         {:op :jvm-int-div
+                                                          :args [{:op :jvm-local
+                                                                  :name 'y
+                                                                  :jvm-type :int}
+                                                                 {:op :jvm-int
+                                                                  :value 2
+                                                                  :jvm-type :int}]
+                                                          :jvm-type :int}]
+                                                  :jvm-type :boolean}]
+                                          :jvm-type :boolean}]
+                                  :jvm-type :boolean}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.operators" bytes)
+          method (.getMethod klass "compute" (into-array Class [Integer/TYPE Integer/TYPE Boolean/TYPE]))]
+      (should= true (.invoke method nil (object-array [(int 3) (int 4) false])))
+      (should= false (.invoke method nil (object-array [(int 8) (int 5) true])))))
+
   (it "emits static Java field access"
     (let [plan {:op :jvm-module
                 :module-name 'example/java_static_field

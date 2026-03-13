@@ -135,6 +135,29 @@
       (should= 1 (.invoke method nil (object-array [true])))
       (should= 0 (.invoke method nil (object-array [false])))))
 
+  (it "compiles AIR-J source with primitive operators into executable bytes"
+    (let [source "(module example/operators
+                    (imports)
+                    (export compute)
+                    (fn compute
+                      (params (x Int) (y Int) (flag Bool))
+                      (returns Bool)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (bool-or
+                        (bool-not (local flag))
+                        (bool-and
+                          (int-lt (int-add (local x) (local y))
+                                  (int-mul 10 (int-sub (local y) 1)))
+                          (int-eq (int-mod (local x) 2)
+                                  (int-div (local y) 2))))))"
+          bundle (sut/compile-source source)
+          klass (define-class "example.operators" (get bundle "example/operators"))
+          method (.getMethod klass "compute" (into-array Class [Integer/TYPE Integer/TYPE Boolean/TYPE]))]
+      (should= true (.invoke method nil (object-array [(int 3) (int 4) false])))
+      (should= false (.invoke method nil (object-array [(int 8) (int 5) true])))))
+
   (it "writes compiled class files to disk"
     (let [source "(module example/write
                     (imports)

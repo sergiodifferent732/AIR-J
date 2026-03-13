@@ -233,6 +233,28 @@
                                   :signature {:params ['String]
                                               :return-type 'Unit}
                                   :args ["hello"]}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "treats primitive operators as pure while including operand effects"
+    (let [module {:name 'example/operator-effects
+                  :imports [{:op :java-import
+                             :class-name 'java.lang.Math}]
+                  :exports ['compute]
+                  :decls [{:op :fn
+                           :name 'compute
+                           :params [{:name 'value :type 'Int}]
+                           :return-type 'Int
+                           :effects ['Foreign.Throw]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :int-add
+                                  :args [{:op :java-static-call
+                                          :class-name 'java.lang.Math
+                                          :member-id 'abs
+                                          :signature {:params ['Int]
+                                                      :return-type 'Int}
+                                          :args [{:op :local :name 'value}]}
+                                         1]}}]}]
       (should= module (sut/check-module module)))))
 
 (describe "expr-effects"

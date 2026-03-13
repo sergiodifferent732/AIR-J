@@ -357,6 +357,46 @@
                 :field-type '(Java java.io.PrintStream)}
                (-> ast :decls first :body))))
 
+  (it "parses primitive operator expressions"
+    (let [source "(module example/ops
+                    (imports)
+                    (export compute)
+                    (fn compute
+                      (params (x Int) (y Int) (flag Bool))
+                      (returns Bool)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (bool-or
+                        (bool-not (local flag))
+                        (bool-and
+                          (int-lt (int-add (local x) (local y))
+                                  (int-mul 10 (int-sub (local y) 1)))
+                          (int-eq (int-mod (local x) 2)
+                                  (int-div (local y) 2))))))"
+          ast (sut/parse-module source)]
+      (should= {:op :bool-or
+                :args [{:op :bool-not
+                        :arg {:op :local :name 'flag}}
+                       {:op :bool-and
+                        :args [{:op :int-lt
+                                :args [{:op :int-add
+                                        :args [{:op :local :name 'x}
+                                               {:op :local :name 'y}]}
+                                       {:op :int-mul
+                                        :args [10
+                                               {:op :int-sub
+                                                :args [{:op :local :name 'y}
+                                                       1]}]}]}
+                               {:op :int-eq
+                                :args [{:op :int-mod
+                                        :args [{:op :local :name 'x}
+                                               2]}
+                                       {:op :int-div
+                                        :args [{:op :local :name 'y}
+                                               2]}]}]}]}
+               (-> ast :decls first :body))))
+
   (it "parses structured AIR-J imports"
     (let [source "(module example/imports
                     (imports
