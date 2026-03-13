@@ -538,6 +538,10 @@ Examples of the intended category:
 - boolean logic
 - other primitive operations only when they materially reduce agent planning and transformation cost
 
+Canonical persisted AIR-J should not add alternate branching spellings such as `when` or `unless`.
+
+If an authoring layer wants them, it may lower them to canonical `if` before persisted AIR-J is produced.
+
 ## Recommended next step
 
 The next document should be a compact formal spec for version 0:

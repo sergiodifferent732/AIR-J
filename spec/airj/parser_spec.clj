@@ -426,6 +426,61 @@
                                        10]}]}]}
                (-> ast :decls first :body))))
 
+  (it "parses string equality int inequality conversion and stdout output"
+    (let [source "(module example/io-ops
+                    (imports)
+                    (export program)
+                    (fn program
+                      (params (x Int) (label String))
+                      (returns Bool)
+                      (effects (Stdout.Write))
+                      (requires true)
+                      (ensures true)
+                      (seq
+                        (io/println (int->string (local x)))
+                        (string-eq (local label) \"ok\")
+                        (int-ne (local x) 0))))"
+          ast (sut/parse-module source)]
+      (should= {:op :seq
+                :exprs [{:op :io-println
+                         :arg {:op :int->string
+                               :arg {:op :local :name 'x}}}
+                        {:op :string-eq
+                         :args [{:op :local :name 'label}
+                                "ok"]}
+                        {:op :int-ne
+                         :args [{:op :local :name 'x}
+                                0]}]}
+               (-> ast :decls first :body))))
+
+  (it "rejects when as a non-canonical persisted form"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Unsupported expression."
+                  (sut/parse-module "(module example/noncanonical
+                                      (imports)
+                                      (export f)
+                                      (fn f
+                                        (params)
+                                        (returns Int)
+                                        (effects ())
+                                        (requires true)
+                                        (ensures true)
+                                        (when true 1))")))
+
+  (it "rejects unless as a non-canonical persisted form"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Unsupported expression."
+                  (sut/parse-module "(module example/noncanonical
+                                      (imports)
+                                      (export f)
+                                      (fn f
+                                        (params)
+                                        (returns Int)
+                                        (effects ())
+                                        (requires true)
+                                        (ensures true)
+                                        (unless true 1))")))
+
   (it "parses structured AIR-J imports"
     (let [source "(module example/imports
                     (imports

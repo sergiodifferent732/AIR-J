@@ -279,9 +279,33 @@
                                                   :args [{:op :local :name 'value}]}
                                                  1]}
                                          {:op :int-le
-                                          :args [{:op :local :name 'value}
+                                         :args [{:op :local :name 'value}
                                                  10]}]}}]}]
       (should= module (sut/check-module module)))))
+
+  (it "treats conversion and equality as pure but records stdout output effects"
+    (let [module {:name 'example/io-effects
+                  :imports []
+                  :exports ['program]
+                  :decls [{:op :fn
+                           :name 'program
+                           :params [{:name 'value :type 'Int}
+                                    {:name 'label :type 'String}]
+                           :return-type 'Bool
+                           :effects ['Stdout.Write]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq
+                                  :exprs [{:op :io-println
+                                           :arg {:op :int->string
+                                                 :arg {:op :local :name 'value}}}
+                                          {:op :string-eq
+                                           :args [{:op :local :name 'label}
+                                                  "ok"]}
+                                          {:op :int-ne
+                                           :args [{:op :local :name 'value}
+                                                  0]}]}}]}]
+      (should= module (sut/check-module module))))
 
 (describe "expr-effects"
   (it "treats lambda creation as pure but checks the lambda body against declared effects"

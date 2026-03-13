@@ -342,6 +342,57 @@
       (should= true (.invoke method nil (object-array [(int 4) (int 4)])))
       (should= false (.invoke method nil (object-array [(int 2) (int 9)])))))
 
+  (it "emits conversion equality and stdout output"
+    (let [plan {:op :jvm-module
+                :module-name 'example/io_ops
+                :internal-name "example/io_ops"
+                :exports ['program]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'program
+                           :owner "example/io_ops"
+                           :params [{:name 'x :jvm-type :int}
+                                    {:name 'label :jvm-type "java/lang/String"}]
+                           :return-type :boolean
+                           :effects ['Stdout.Write]
+                           :body {:op :jvm-seq
+                                  :exprs [{:op :jvm-io-println
+                                           :arg {:op :jvm-int->string
+                                                 :arg {:op :jvm-local
+                                                       :name 'x
+                                                       :jvm-type :int}
+                                                 :jvm-type "java/lang/String"}
+                                           :jvm-type :void}
+                                          {:op :jvm-string-eq
+                                           :args [{:op :jvm-local
+                                                   :name 'label
+                                                   :jvm-type "java/lang/String"}
+                                                  {:op :jvm-string
+                                                   :value "ok"
+                                                   :jvm-type "java/lang/String"}]
+                                           :jvm-type :boolean}
+                                          {:op :jvm-int-ne
+                                           :args [{:op :jvm-local
+                                                   :name 'x
+                                                   :jvm-type :int}
+                                                  {:op :jvm-int
+                                                   :value 0
+                                                   :jvm-type :int}]
+                                           :jvm-type :boolean}]
+                                  :jvm-type :boolean}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.io_ops" bytes)
+          method (.getMethod klass "program" (into-array Class [Integer/TYPE String]))
+          out-bytes (java.io.ByteArrayOutputStream.)
+          original-out (java.lang.System/out)]
+      (try
+        (java.lang.System/setOut (java.io.PrintStream. out-bytes true "UTF-8"))
+        (should= true (.invoke method nil (object-array [(int 7) "ok"])))
+        (should= "7\n" (.toString out-bytes "UTF-8"))
+        (finally
+          (java.lang.System/setOut original-out)))))
+
   (it "emits static Java field access"
     (let [plan {:op :jvm-module
                 :module-name 'example/java_static_field

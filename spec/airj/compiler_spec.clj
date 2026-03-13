@@ -179,6 +179,33 @@
       (should= true (.invoke method nil (object-array [(int 4) (int 4)])))
       (should= false (.invoke method nil (object-array [(int 2) (int 9)])))))
 
+  (it "compiles AIR-J source with conversion equality and stdout output"
+    (let [source "(module example/io-ops
+                    (imports)
+                    (export program)
+                    (fn program
+                      (params (x Int) (label String))
+                      (returns Bool)
+                      (effects (Stdout.Write))
+                      (requires true)
+                      (ensures true)
+                      (seq
+                        (io/println (int->string (local x)))
+                        (string-eq (local label) \"ok\")
+                        (int-ne (local x) 0))))"
+          bundle (sut/compile-source source)
+          klass (define-class "example.io-ops" (get bundle "example/io-ops"))
+          method (.getMethod klass "program" (into-array Class [Integer/TYPE String]))
+          out-bytes (java.io.ByteArrayOutputStream.)
+          out-stream (java.io.PrintStream. out-bytes true "UTF-8")
+          original-out (java.lang.System/out)]
+      (try
+        (java.lang.System/setOut out-stream)
+        (should= true (.invoke method nil (object-array [(int 7) "ok"])))
+        (should= "7\n" (.toString out-bytes "UTF-8"))
+        (finally
+          (java.lang.System/setOut original-out)))))
+
   (it "writes compiled class files to disk"
     (let [source "(module example/write
                     (imports)

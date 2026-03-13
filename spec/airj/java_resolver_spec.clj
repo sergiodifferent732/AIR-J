@@ -139,7 +139,7 @@
                                   :field-type 'Int}}]}]
       (should-throw clojure.lang.ExceptionInfo
                     "Unknown Java field."
-                    (sut/check-module module)))))
+                    (sut/check-module module))))
 
   (it "accepts java interop over loop-bound locals"
     (let [module {:name 'example/loop-builder
@@ -189,3 +189,28 @@
                                   :field-type '(Java java.io.PrintStream)}}]}]
       (should= module
                (sut/check-module module))))
+
+  (it "accepts resolvable static Java field assignment"
+    (let [module {:name 'example/static-field-write
+                  :imports [{:op :java-import
+                             :class-name 'java.lang.System}
+                            {:op :java-import
+                             :class-name 'java.io.PrintStream}]
+                  :exports ['swap]
+                  :decls [{:op :fn
+                           :name 'swap
+                           :params []
+                           :return-type 'Unit
+                           :effects ['State.Write]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :java-static-set-field
+                                  :class-name 'java.lang.System
+                                  :field-name 'out
+                                  :field-type '(Java java.io.PrintStream)
+                                  :expr {:op :java-new
+                                         :class-name 'java.io.PrintStream
+                                         :type-args []
+                                         :args ["build/logs/airj.out"]}}}]}]
+      (should= module
+               (sut/check-module module)))))

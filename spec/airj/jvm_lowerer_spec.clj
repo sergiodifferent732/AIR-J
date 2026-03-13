@@ -390,6 +390,58 @@
                    first
                    :body))))
 
+  (it "lowers conversion equality and stdout output into JVM plan nodes"
+    (let [module {:name 'example/io_ops
+                  :imports []
+                  :exports ['program]
+                  :decls [{:op :fn
+                           :name 'program
+                           :params [{:name 'x :type 'Int}
+                                    {:name 'label :type 'String}]
+                           :return-type 'Bool
+                           :effects ['Stdout.Write]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq
+                                  :exprs [{:op :io-println
+                                           :arg {:op :int->string
+                                                 :arg {:op :local :name 'x}}}
+                                          {:op :string-eq
+                                           :args [{:op :local :name 'label}
+                                                  "ok"]}
+                                          {:op :int-ne
+                                           :args [{:op :local :name 'x}
+                                                  0]}]}}]}]
+      (should= {:op :jvm-seq
+                :exprs [{:op :jvm-io-println
+                         :arg {:op :jvm-int->string
+                               :arg {:op :jvm-local
+                                     :name 'x
+                                     :jvm-type :int}
+                               :jvm-type "java/lang/String"}
+                         :jvm-type :void}
+                        {:op :jvm-string-eq
+                         :args [{:op :jvm-local
+                                 :name 'label
+                                 :jvm-type "java/lang/String"}
+                                {:op :jvm-string
+                                 :value "ok"
+                                 :jvm-type "java/lang/String"}]
+                         :jvm-type :boolean}
+                        {:op :jvm-int-ne
+                         :args [{:op :jvm-local
+                                 :name 'x
+                                 :jvm-type :int}
+                                {:op :jvm-int
+                                 :value 0
+                                 :jvm-type :int}]
+                         :jvm-type :boolean}]
+                :jvm-type :boolean}
+               (-> (sut/lower-module module)
+                   :methods
+                   first
+                   :body))))
+
   (it "lowers imported function calls to the imported module owner"
     (let [module {:name 'example/imported
                   :imports [{:op :airj-import

@@ -334,13 +334,37 @@
                                                  {:op :local :name 'y}]}
                                          {:op :bool-or
                                           :args [{:op :local :name 'flag}
-                                                 {:op :bool-and
-                                                  :args [{:op :int-gt
-                                                          :args [{:op :local :name 'y}
-                                                                 0]}
-                                                         {:op :int-le
-                                                          :args [{:op :local :name 'x}
-                                                                 {:op :local :name 'y}]}]}]}]}}]}]
+                                {:op :bool-and
+                                  :args [{:op :int-gt
+                                          :args [{:op :local :name 'y}
+                                                 0]}
+                                         {:op :int-le
+                                          :args [{:op :local :name 'x}
+                                                 {:op :local :name 'y}]}]}]}]}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "accepts string equality int inequality conversion and stdout output"
+    (let [module {:name 'example/io-ops
+                  :imports []
+                  :exports ['program]
+                  :decls [{:op :fn
+                           :name 'program
+                           :params [{:name 'x :type 'Int}
+                                    {:name 'label :type 'String}]
+                           :return-type 'Bool
+                           :effects ['Stdout.Write]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq
+                                  :exprs [{:op :io-println
+                                           :arg {:op :int->string
+                                                 :arg {:op :local :name 'x}}}
+                                          {:op :string-eq
+                                           :args [{:op :local :name 'label}
+                                                  "ok"]}
+                                          {:op :int-ne
+                                           :args [{:op :local :name 'x}
+                                                  0]}]}}]}]
       (should= module (sut/check-module module))))
 
   (it "accepts calls to imported functions from supplied interfaces"
