@@ -415,6 +415,69 @@
                                                       1]}}}}]}]
       (should= module (sut/check-module module))))
 
+  (it "accepts direct sequence length checks over StringSeq"
+    (let [module {:name 'example/text-seq-length
+                  :imports []
+                  :exports ['count-parts]
+                  :decls [{:op :fn
+                           :name 'count-parts
+                           :params [{:name 'line :type 'String}]
+                           :return-type 'Int
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq-length
+                                  :arg {:op :string-split-on
+                                        :args [{:op :local :name 'line}
+                                               ","]}}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "accepts substring char-at and first/empty sequence primitives"
+    (let [module {:name 'example/text-scan
+                  :imports []
+                  :exports ['token]
+                  :decls [{:op :fn
+                           :name 'token
+                           :params [{:name 'line :type 'String}]
+                           :return-type 'String
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :if
+                                  :test {:op :seq-empty?
+                                         :arg {:op :string-split-on
+                                               :args [{:op :local :name 'line}
+                                                      ","]}}
+                                  :then ""
+                                  :else {:op :string-char-at
+                                         :args [{:op :string-substring
+                                                 :args [{:op :seq-first
+                                                         :arg {:op :string-split-on
+                                                               :args [{:op :local :name 'line}
+                                                                      ","]}}
+                                                        1
+                                                        3]}
+                                                0]}}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "rejects string-char-at with a non-int index"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Type mismatch."
+                  (sut/check-module
+                   {:name 'example/bad-char-at
+                    :imports []
+                    :exports ['token]
+                    :decls [{:op :fn
+                             :name 'token
+                             :params [{:name 'line :type 'String}]
+                             :return-type 'String
+                             :effects []
+                             :requires [true]
+                             :ensures [true]
+                             :body {:op :string-char-at
+                                    :args [{:op :local :name 'line}
+                                           "0"]}}]}))))
+
   (it "accepts calls to imported functions from supplied interfaces"
     (let [module {:name 'example/imported-call
                   :imports [{:op :airj-import
@@ -929,4 +992,62 @@
                                                  :class-name 'java.io.ByteArrayOutputStream
                                                  :type-args []
                                                  :args []}]}}}]}]
-      (should= module (sut/check-module module)))))
+      (should= module (sut/check-module module))))
+
+  (it "infers types for static Java field writes directly"
+    (let [expr {:op :java-static-set-field
+                :class-name 'java.lang.System
+                :field-name 'out
+                :field-type '(Java java.io.PrintStream)
+                :expr {:op :java-new
+                       :class-name 'java.io.PrintStream
+                       :type-args []
+                       :args [{:op :java-new
+                               :class-name 'java.io.ByteArrayOutputStream
+                               :type-args []
+                               :args []}]}}
+          ctx {:locals {}
+               :mutable #{}}]
+      (should= 'Unit (sut/infer-expr-type expr ctx {}))))
+
+  (it "rejects mismatched static Java field writes"
+    (let [expr {:op :java-static-set-field
+                :class-name 'java.lang.System
+                :field-name 'out
+                :field-type '(Java java.io.PrintStream)
+                :expr "not-a-stream"}
+          ctx {:locals {}
+               :mutable #{}}]
+      (should-throw clojure.lang.ExceptionInfo
+                    #"Type mismatch"
+                    (sut/infer-expr-type expr ctx {}))))
+
+  (it "leaves invariant context unchanged for non-invariant declarations"
+    (let [ctx {:env {'value 'String}
+               :mutable #{}
+               :loop-types nil}
+          invariant-ctx (ns-resolve 'airj.type-checker 'invariant-ctx)]
+      (should= ctx (invariant-ctx {:op :fn
+                                   :name 'noop}
+                                  ctx))))
+
+  (it "returns the original context from the invariant passthrough helper"
+    (let [ctx {:env {'value 'String}
+               :mutable #{}
+               :loop-types nil}
+          passthrough-invariant-ctx (ns-resolve 'airj.type-checker 'passthrough-invariant-ctx)]
+      (should= ctx (passthrough-invariant-ctx {:op :fn
+                                               :name 'noop}
+                                              ctx))))
+
+  (it "checks invariants on non-data declarations with the existing context"
+    (let [ctx {:env {'value 'Bool}
+               :mutable #{}
+               :loop-types nil}
+          check-invariants (ns-resolve 'airj.type-checker 'check-invariants)]
+      (should-not-throw
+        (check-invariants {:op :fn
+                           :name 'noop
+                           :invariants [{:op :local :name 'value}]}
+                          ctx
+                          {}))))

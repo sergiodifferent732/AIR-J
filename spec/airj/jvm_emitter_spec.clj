@@ -492,6 +492,63 @@
       (should= 2 (.invoke method nil (object-array [" a,bb "])))
       (should= 0 (.invoke method nil (object-array ["   "])))))
 
+  (it "emits substring char-at and first/empty sequence primitives"
+    (let [plan {:op :jvm-module
+                :module-name 'example/text_scan
+                :internal-name "example/text_scan"
+                :exports ['token]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'token
+                           :owner "example/text_scan"
+                           :params [{:name 'line :jvm-type "java/lang/String"}]
+                           :return-type "java/lang/String"
+                           :effects []
+                           :body {:op :jvm-if
+                                  :test {:op :jvm-seq-empty
+                                         :arg {:op :jvm-string-split-on
+                                               :args [{:op :jvm-local
+                                                       :name 'line
+                                                       :jvm-type "java/lang/String"}
+                                                      {:op :jvm-string
+                                                       :value ","
+                                                       :jvm-type "java/lang/String"}]
+                                               :jvm-type "[Ljava/lang/String;"}
+                                         :jvm-type :boolean}
+                                  :then {:op :jvm-string
+                                         :value ""
+                                         :jvm-type "java/lang/String"}
+                                  :else {:op :jvm-string-char-at
+                                         :args [{:op :jvm-string-substring
+                                                 :args [{:op :jvm-seq-first
+                                                         :arg {:op :jvm-string-split-on
+                                                               :args [{:op :jvm-local
+                                                                       :name 'line
+                                                                       :jvm-type "java/lang/String"}
+                                                                      {:op :jvm-string
+                                                                       :value ","
+                                                                       :jvm-type "java/lang/String"}]
+                                                               :jvm-type "[Ljava/lang/String;"}
+                                                         :jvm-type "java/lang/String"}
+                                                        {:op :jvm-int
+                                                         :value 1
+                                                         :jvm-type :int}
+                                                        {:op :jvm-int
+                                                         :value 3
+                                                         :jvm-type :int}]
+                                                 :jvm-type "java/lang/String"}
+                                                {:op :jvm-int
+                                                 :value 0
+                                                 :jvm-type :int}]
+                                         :jvm-type "java/lang/String"}
+                                  :jvm-type "java/lang/String"}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.text_scan" bytes)
+          method (.getMethod klass "token" (into-array Class [String]))]
+      (should= "b" (.invoke method nil (object-array ["abz,qq"])))
+      (should= "" (.invoke method nil (object-array [","])))))
+
   (it "emits static Java field access"
     (let [plan {:op :jvm-module
                 :module-name 'example/java_static_field

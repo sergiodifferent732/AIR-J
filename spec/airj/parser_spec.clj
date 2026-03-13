@@ -513,6 +513,43 @@
                                     1]}}}
                (-> ast :decls first :body))))
 
+  (it "parses substring char-at and first/empty sequence primitives"
+    (let [source "(module example/text-scan
+                    (imports)
+                    (export token)
+                    (fn token
+                      (params (line String))
+                      (returns String)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (if
+                        (seq-empty? (string-split-on (local line) \",\"))
+                        \"\"
+                        (string-char-at
+                          (string-substring
+                            (seq-first (string-split-on (local line) \",\"))
+                            1
+                            3)
+                          0))))"
+          ast (sut/parse-module source)]
+      (should= {:op :if
+                :test {:op :seq-empty?
+                       :arg {:op :string-split-on
+                             :args [{:op :local :name 'line}
+                                    ","]}}
+                :then ""
+                :else {:op :string-char-at
+                       :args [{:op :string-substring
+                               :args [{:op :seq-first
+                                       :arg {:op :string-split-on
+                                             :args [{:op :local :name 'line}
+                                                    ","]}}
+                                      1
+                                      3]}
+                              0]}}
+               (-> ast :decls first :body))))
+
   (it "rejects when as a non-canonical persisted form"
     (should-throw clojure.lang.ExceptionInfo
                   "Unsupported expression."

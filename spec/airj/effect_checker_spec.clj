@@ -355,6 +355,34 @@
                                                       1]}}}}]}]
       (should= module (sut/check-module module))))
 
+  (it "treats substring char-at and first/empty sequence primitives as pure"
+    (let [module {:name 'example/text-scan
+                  :imports []
+                  :exports ['token]
+                  :decls [{:op :fn
+                           :name 'token
+                           :params [{:name 'line :type 'String}]
+                           :return-type 'String
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :if
+                                  :test {:op :seq-empty?
+                                         :arg {:op :string-split-on
+                                               :args [{:op :local :name 'line}
+                                                      ","]}}
+                                  :then ""
+                                  :else {:op :string-char-at
+                                         :args [{:op :string-substring
+                                                 :args [{:op :seq-first
+                                                         :arg {:op :string-split-on
+                                                               :args [{:op :local :name 'line}
+                                                                      ","]}}
+                                                        1
+                                                        3]}
+                                                0]}}}]}]
+      (should= module (sut/check-module module))))
+
   (it "rejects missing effects for fallible text I/O primitives"
     (should-throw clojure.lang.ExceptionInfo
                   "Effect mismatch."

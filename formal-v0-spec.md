@@ -20,6 +20,7 @@ Version 0 includes:
 - a small closed expression language
 - explicit Java interop
 - direct lowering to JVM bytecode
+- canonical primitive operators and text/sequence built-ins where they reduce interop churn for agents
 
 Version 0 excludes:
 - macros

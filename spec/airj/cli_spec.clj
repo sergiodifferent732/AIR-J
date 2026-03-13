@@ -548,17 +548,43 @@
     (let [error (ex-info "Project command failed."
                          {:command "run"
                           :root-module 'example/use
+                          :phase :project
                           :module 'alpha/math})]
-      (should= "Project command failed: run example/use\nMissing module: alpha/math"
+      (should= "{:message \"Project command failed.\", :phase :project, :data {:command \"run\", :root-module example/use, :phase :project, :module alpha/math}}"
                (#'sut/format-cli-error error))))
 
   (it "formats project cycle failures for main"
     (let [error (ex-info "Project command failed."
                          {:command "check"
                           :root-module 'alpha/math
+                          :phase :project
                           :cycle ['alpha/math 'beta/math 'alpha/math]})]
-      (should= "Project command failed: check alpha/math\nImport cycle: [alpha/math beta/math alpha/math]"
+      (should= "{:message \"Project command failed.\", :phase :project, :data {:command \"check\", :root-module alpha/math, :phase :project, :cycle [alpha/math beta/math alpha/math]}}"
                (#'sut/format-cli-error error))))
+
+  (it "formats non-project failures as machine-readable diagnostics"
+    (let [error (ex-info "Type mismatch."
+                         {:phase :type-check
+                          :expected 'Int
+                          :actual 'String})]
+      (should= "{:message \"Type mismatch.\", :phase :type-check, :data {:phase :type-check, :expected Int, :actual String}}"
+               (#'sut/format-cli-error error))))
+
+  (it "prints formatted exception diagnostics through the main error handler"
+    (let [error (ex-info "Type mismatch."
+                         {:phase :type-check
+                          :expected 'Int
+                          :actual 'String})
+          err (java.io.StringWriter.)
+          out (java.io.StringWriter.)]
+      (binding [*err* err
+                *out* out]
+        (should= 1 (#'sut/handle-cli-exception error)))
+      (should= "" (str out))
+      (should-contain ":message \"Type mismatch.\"" (str err))
+      (should-contain ":phase :type-check" (str err))
+      (should-contain ":expected Int" (str err))
+      (should-contain ":actual String" (str err))))
 
   (it "prints formatted project errors to stderr in main"
     (let [project-dir (.toString (java.nio.file.Files/createTempDirectory "airj-cli-main-project-missing"
@@ -582,8 +608,10 @@
                 *in* (java.io.StringReader. "")]
         (should= 1 (#'sut/-main "run" "--project-dir" project-dir "example/use")))
       (should= "" (str out))
-      (should-contain "Project command failed: run example/use" (str err))
-      (should-contain "Missing module: alpha/math" (str err))))
+      (should-contain ":message \"Project command failed.\"" (str err))
+      (should-contain ":phase :project" (str err))
+      (should-contain ":module alpha/math" (str err))
+      (should-contain ":root-module example/use" (str err))))
 
   (it "renders built module byte sizes for the build command"
     (let [source "(module example/build

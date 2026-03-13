@@ -548,6 +548,75 @@
                    first
                    :body))))
 
+  (it "lowers substring char-at and first/empty sequence primitives into JVM plan nodes"
+    (let [module {:name 'example/text_scan
+                  :imports []
+                  :exports ['token]
+                  :decls [{:op :fn
+                           :name 'token
+                           :params [{:name 'line :type 'String}]
+                           :return-type 'String
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :if
+                                  :test {:op :seq-empty?
+                                         :arg {:op :string-split-on
+                                               :args [{:op :local :name 'line}
+                                                      ","]}}
+                                  :then ""
+                                  :else {:op :string-char-at
+                                         :args [{:op :string-substring
+                                                 :args [{:op :seq-first
+                                                         :arg {:op :string-split-on
+                                                               :args [{:op :local :name 'line}
+                                                                      ","]}}
+                                                        1
+                                                        3]}
+                                                0]}}}]}]
+      (should= {:op :jvm-if
+                :test {:op :jvm-seq-empty
+                       :arg {:op :jvm-string-split-on
+                             :args [{:op :jvm-local
+                                     :name 'line
+                                     :jvm-type "java/lang/String"}
+                                    {:op :jvm-string
+                                     :value ","
+                                     :jvm-type "java/lang/String"}]
+                             :jvm-type "[Ljava/lang/String;"}
+                       :jvm-type :boolean}
+                :then {:op :jvm-string
+                       :value ""
+                       :jvm-type "java/lang/String"}
+                :else {:op :jvm-string-char-at
+                       :args [{:op :jvm-string-substring
+                               :args [{:op :jvm-seq-first
+                                       :arg {:op :jvm-string-split-on
+                                             :args [{:op :jvm-local
+                                                     :name 'line
+                                                     :jvm-type "java/lang/String"}
+                                                    {:op :jvm-string
+                                                     :value ","
+                                                     :jvm-type "java/lang/String"}]
+                                             :jvm-type "[Ljava/lang/String;"}
+                                       :jvm-type "java/lang/String"}
+                                      {:op :jvm-int
+                                       :value 1
+                                       :jvm-type :int}
+                                      {:op :jvm-int
+                                       :value 3
+                                       :jvm-type :int}]
+                               :jvm-type "java/lang/String"}
+                              {:op :jvm-int
+                               :value 0
+                               :jvm-type :int}]
+                       :jvm-type "java/lang/String"}
+                :jvm-type "java/lang/String"}
+               (-> (sut/lower-module module)
+                   :methods
+                   first
+                   :body))))
+
   (it "lowers imported function calls to the imported module owner"
     (let [module {:name 'example/imported
                   :imports [{:op :airj-import

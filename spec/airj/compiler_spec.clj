@@ -260,6 +260,31 @@
       (should= 2 (.invoke method nil (object-array [" a,bb "])))
       (should= 0 (.invoke method nil (object-array ["   "])))))
 
+  (it "compiles AIR-J source with substring char-at and first/empty sequence primitives"
+    (let [source "(module example/text-scan
+                    (imports)
+                    (export token)
+                    (fn token
+                      (params (line String))
+                      (returns String)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (if
+                        (seq-empty? (string-split-on (local line) \",\"))
+                        \"\"
+                        (string-char-at
+                          (string-substring
+                            (seq-first (string-split-on (local line) \",\"))
+                            1
+                            3)
+                          0))))"
+          bundle (sut/compile-source source)
+          klass (define-class "example.text-scan" (get bundle "example/text-scan"))
+          method (.getMethod klass "token" (into-array Class [String]))]
+      (should= "b" (.invoke method nil (object-array ["abz,qq"])))
+      (should= "" (.invoke method nil (object-array [","])))))
+
   (it "writes compiled class files to disk"
     (let [source "(module example/write
                     (imports)
