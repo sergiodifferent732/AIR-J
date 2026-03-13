@@ -740,4 +740,39 @@
                                          :class-name 'java.io.ByteArrayOutputStream
                                          :type-args []
                                          :args []}}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "accepts static Java field access and assignable writes"
+    (let [module {:name 'example/java-static-field
+                  :imports []
+                  :exports ['stream 'swap]
+                  :decls [{:op :fn
+                           :name 'stream
+                           :params []
+                           :return-type '(Java java.io.PrintStream)
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :java-static-get-field
+                                  :class-name 'java.lang.System
+                                  :field-name 'out
+                                  :field-type '(Java java.io.PrintStream)}}
+                          {:op :fn
+                           :name 'swap
+                           :params []
+                           :return-type 'Unit
+                           :effects ['State.Write]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :java-static-set-field
+                                  :class-name 'java.lang.System
+                                  :field-name 'out
+                                  :field-type '(Java java.io.PrintStream)
+                                  :expr {:op :java-new
+                                         :class-name 'java.io.PrintStream
+                                         :type-args []
+                                         :args [{:op :java-new
+                                                 :class-name 'java.io.ByteArrayOutputStream
+                                                 :type-args []
+                                                 :args []}]}}}]}]
       (should= module (sut/check-module module)))))

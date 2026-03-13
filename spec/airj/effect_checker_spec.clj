@@ -208,6 +208,31 @@
                                                              :name 'args}]}}]
                                   :body {:op :local
                                          :name 'n}}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "accepts static Java field access and printing effects"
+    (let [module {:name 'example/java-static-field
+                  :imports [{:op :java-import
+                             :class-name 'java.lang.System}
+                            {:op :java-import
+                             :class-name 'java.io.PrintStream}]
+                  :exports ['main]
+                  :decls [{:op :fn
+                           :name 'main
+                           :params []
+                           :return-type 'Unit
+                           :effects ['Foreign.Throw]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :java-call
+                                  :target {:op :java-static-get-field
+                                           :class-name 'java.lang.System
+                                           :field-name 'out
+                                           :field-type '(Java java.io.PrintStream)}
+                                  :member-id 'println
+                                  :signature {:params ['String]
+                                              :return-type 'Unit}
+                                  :args ["hello"]}}]}]
       (should= module (sut/check-module module)))))
 
 (describe "expr-effects"

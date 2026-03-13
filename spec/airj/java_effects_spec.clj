@@ -71,5 +71,21 @@
                :field-type Integer/TYPE}))
     (should= #{}
              (sut/interop-effects
+              {:op :java-static-get-field}
+              {:kind :field
+               :class-name 'java.lang.System
+               :field-name 'out
+               :static? true
+               :field-type java.io.PrintStream}))
+    (should= #{'State.Write}
+             (sut/interop-effects
+              {:op :java-static-set-field}
+              {:kind :field
+               :class-name 'java.lang.System
+               :field-name 'out
+               :static? true
+               :field-type java.io.PrintStream}))
+    (should= #{}
+             (sut/interop-effects
               {:op :bogus}
               {:kind :method}))))

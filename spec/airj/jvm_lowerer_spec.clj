@@ -161,6 +161,52 @@
                    first
                    :body))))
 
+  (it "lowers static Java fields into JVM plan nodes"
+    (let [module {:name 'example/java_static_field
+                  :imports []
+                  :exports ['interop]
+                  :decls [{:op :fn
+                           :name 'interop
+                           :params []
+                           :return-type '(Java java.io.PrintStream)
+                           :effects ['State.Write]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq
+                                  :exprs [{:op :java-static-set-field
+                                           :class-name 'java.lang.System
+                                           :field-name 'out
+                                           :field-type '(Java java.io.PrintStream)
+                                           :expr {:op :java-static-get-field
+                                                  :class-name 'java.lang.System
+                                                  :field-name 'out
+                                                  :field-type '(Java java.io.PrintStream)}}
+                                          {:op :java-static-get-field
+                                           :class-name 'java.lang.System
+                                           :field-name 'out
+                                           :field-type '(Java java.io.PrintStream)}]}}]}]
+      (should= {:op :jvm-seq
+                :exprs [{:op :jvm-java-static-set-field
+                         :class-name "java/lang/System"
+                         :field-name 'out
+                         :field-type "java/io/PrintStream"
+                         :expr {:op :jvm-java-static-get-field
+                                :class-name "java/lang/System"
+                                :field-name 'out
+                                :field-type "java/io/PrintStream"
+                                :jvm-type "java/io/PrintStream"}
+                         :jvm-type :void}
+                        {:op :jvm-java-static-get-field
+                         :class-name "java/lang/System"
+                         :field-name 'out
+                         :field-type "java/io/PrintStream"
+                         :jvm-type "java/io/PrintStream"}]
+                :jvm-type "java/io/PrintStream"}
+               (-> (sut/lower-module module)
+                   :methods
+                   first
+                   :body))))
+
   (it "lowers Bool Unit and Java types"
     (let [module {:name 'example/types
                   :imports []

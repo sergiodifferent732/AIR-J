@@ -168,3 +168,24 @@
                                          :args []}}}]}]
       (should= module
                (sut/check-module module))))
+
+  (it "accepts resolvable static Java fields"
+    (let [module {:name 'example/static-field
+                  :imports [{:op :java-import
+                             :class-name 'java.lang.System}
+                            {:op :java-import
+                             :class-name 'java.io.PrintStream}]
+                  :exports ['stream]
+                  :decls [{:op :fn
+                           :name 'stream
+                           :params []
+                           :return-type '(Java java.io.PrintStream)
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :java-static-get-field
+                                  :class-name 'java.lang.System
+                                  :field-name 'out
+                                  :field-type '(Java java.io.PrintStream)}}]}]
+      (should= module
+               (sut/check-module module))))

@@ -335,6 +335,28 @@
                 :args []}
                (-> ast :decls first :body)))))
 
+  (it "parses static Java field access"
+    (let [source "(module example/java-static-field
+                    (imports
+                      (java java.lang.System))
+                    (export stream)
+                    (fn stream
+                      (params)
+                      (returns (Java java.io.PrintStream))
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (java/get-static-field
+                        java.lang.System
+                        out
+                        (Java java.io.PrintStream))))"
+          ast (sut/parse-module source)]
+      (should= {:op :java-static-get-field
+                :class-name 'java.lang.System
+                :field-name 'out
+                :field-type '(Java java.io.PrintStream)}
+               (-> ast :decls first :body))))
+
   (it "parses structured AIR-J imports"
     (let [source "(module example/imports
                     (imports

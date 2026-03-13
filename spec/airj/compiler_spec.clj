@@ -921,4 +921,37 @@
                       42))"]
       (should-throw clojure.lang.ExceptionInfo
                     "Missing AIR-J main entrypoint."
-                    (sut/run-source! source [])))))
+                    (sut/run-source! source []))))
+
+  (it "runs AIR-J programs that print explicitly via Java static fields"
+    (let [source "(module example/print
+                    (imports
+                      (java java.lang.System)
+                      (java java.io.PrintStream))
+                    (export main)
+                    (fn main
+                      (params)
+                      (returns Unit)
+                      (effects (Foreign.Throw))
+                      (requires true)
+                      (ensures true)
+                      (java/call
+                        (java/get-static-field
+                          java.lang.System
+                          out
+                          (Java java.io.PrintStream))
+                        println
+                        (signature (String) Unit)
+                        \"hello\")))"
+          out-bytes (java.io.ByteArrayOutputStream.)
+          out-stream (java.io.PrintStream. out-bytes)
+          original-out java.lang.System/out]
+      (try
+        (java.lang.System/setOut out-stream)
+        (sut/run-source! source [])
+        (.flush out-stream)
+        (should= "hello\n"
+                 (.toString out-bytes))
+        (finally
+          (java.lang.System/setOut original-out)
+          (.close out-stream))))))

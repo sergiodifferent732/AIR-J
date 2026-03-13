@@ -1,4 +1,3 @@
-;; mutation-tested: 2026-03-11
 (ns airj.java-members
   (:require [airj.java-types :as java-types])
   (:import (java.lang.reflect Constructor Field Method Modifier)))
@@ -89,3 +88,18 @@
                        (= resolved-type (.getType field)))
               (field-meta class-name field field-name)))
           (.getFields klass))))
+
+(defn resolve-static-field
+  [class-name field-name field-type]
+  (let [klass (load-class class-name)
+        resolved-type (java-types/resolve-type field-type)]
+    (some (fn [^Field field]
+            (when (and (= (name field-name) (.getName field))
+                       (Modifier/isStatic (.getModifiers field))
+                       (= resolved-type (.getType field)))
+              (field-meta class-name field field-name)))
+          (.getFields klass))))
+
+;; clj-mutate-manifest-begin
+;; {:version 1, :tested-at "2026-03-13T06:56:33.157066-05:00", :module-hash "999862664", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "-150083525"} {:id "defn-/signature-types", :kind "defn-", :line 5, :end-line 8, :hash "116873283"} {:id "defn-/load-class", :kind "defn-", :line 10, :end-line 16, :hash "1925336506"} {:id "defn-/method-meta", :kind "defn-", :line 18, :end-line 26, :hash "-1576306083"} {:id "defn-/field-meta", :kind "defn-", :line 28, :end-line 35, :hash "2045200684"} {:id "defn-/constructor-meta", :kind "defn-", :line 37, :end-line 42, :hash "-2141890520"} {:id "defn/resolve-constructor", :kind "defn", :line 44, :end-line 51, :hash "-1616075038"} {:id "defn/resolve-static-method", :kind "defn", :line 53, :end-line 64, :hash "-2084839414"} {:id "defn/resolve-instance-method", :kind "defn", :line 66, :end-line 78, :hash "795193005"} {:id "defn/resolve-instance-field", :kind "defn", :line 80, :end-line 90, :hash "-559462980"} {:id "defn/resolve-static-field", :kind "defn", :line 92, :end-line 101, :hash "453955620"}]}
+;; clj-mutate-manifest-end

@@ -38,4 +38,15 @@
                 :field-name 'x
                 :static? false
                 :field-type Integer/TYPE}
+               (select-keys meta [:kind :class-name :field-name :static? :field-type]))))
+
+  (it "resolves static fields to metadata"
+    (let [meta (sut/resolve-static-field 'java.lang.System
+                                         'out
+                                         '(Java java.io.PrintStream))]
+      (should= {:kind :field
+                :class-name 'java.lang.System
+                :field-name 'out
+                :static? true
+                :field-type java.io.PrintStream}
                (select-keys meta [:kind :class-name :field-name :static? :field-type])))))

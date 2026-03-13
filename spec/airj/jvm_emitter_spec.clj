@@ -223,6 +223,30 @@
       (should= 1 (.invoke method nil (object-array [true])))
       (should= 0 (.invoke method nil (object-array [false])))))
 
+  (it "emits static Java field access"
+    (let [plan {:op :jvm-module
+                :module-name 'example/java_static_field
+                :internal-name "example/java_static_field"
+                :exports ['interop]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'interop
+                           :owner "example/java_static_field"
+                           :params []
+                           :return-type "java/io/PrintStream"
+                           :effects []
+                           :body {:op :jvm-java-static-get-field
+                                  :class-name "java/lang/System"
+                                  :field-name 'out
+                                  :field-type "java/io/PrintStream"
+                                  :jvm-type "java/io/PrintStream"}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.java_static_field" bytes)
+          method (.getMethod klass "interop" (into-array Class []))]
+      (should (instance? java.io.PrintStream
+                         (.invoke method nil (object-array []))))))
+
   (it "emits record classes and module methods that construct and read them"
     (let [plan {:op :jvm-module
                 :module-name 'example/records
