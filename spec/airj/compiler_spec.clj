@@ -115,6 +115,33 @@
           method (.getMethod klass "interop" (into-array Class []))]
       (should= 1 (.invoke method nil (object-array [])))))
 
+  (it "compiles a host-backed module into a Java subclass with instance callbacks"
+    (let [source "(module example/hosted
+                    (host java.util.ArrayList)
+                    (imports
+                      (java java.util.ArrayList))
+                    (export snapshot)
+                    (fn snapshot
+                      (params (self (Java java.util.ArrayList)))
+                      (returns Int)
+                      (effects (Foreign.Throw))
+                      (requires true)
+                      (ensures true)
+                      (java/call
+                        (local self)
+                        size
+                        (signature () Int))))"
+          bundle (sut/compile-source source)
+          klass (define-class "example.hosted" (get bundle "example/hosted"))
+          ctor (.getConstructor klass (into-array Class []))
+          instance (.newInstance ctor (object-array []))
+          add-method (.getMethod klass "add" (into-array Class [Object]))
+          snapshot-method (.getMethod klass "snapshot" (into-array Class []))]
+      (.invoke add-method instance (object-array ["earth"]))
+      (.invoke add-method instance (object-array ["mars"]))
+      (should= 2 (.invoke snapshot-method instance (object-array [])))
+      (should= java.util.ArrayList (.getSuperclass klass))))
+
   (it "compiles AIR-J source with simple conditionals into executable bytes"
     (let [source "(module example/choose
                     (imports)

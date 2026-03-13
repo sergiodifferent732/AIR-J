@@ -3,7 +3,8 @@
 
 (defn- class-hierarchy
   [module]
-  (merge {(:internal-name module) "java/lang/Object"}
+  (merge {(:internal-name module) (or (get-in module [:host :class-name])
+                                      "java/lang/Object")}
          (into {}
                (map (fn [record]
                       [(:class-name record) "java/lang/Object"]))
@@ -44,5 +45,5 @@
         (common-super-class hierarchy left right)))))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-12T10:22:11.009899-05:00", :module-hash "1337459988", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 2, :hash "-129056526"} {:id "defn-/class-hierarchy", :kind "defn-", :line 4, :end-line 17, :hash "1620028955"} {:id "defn-/ancestor-chain", :kind "defn-", :line 19, :end-line 26, :hash "-114668316"} {:id "defn-/common-super-class", :kind "defn-", :line 28, :end-line 36, :hash "212174441"} {:id "defn/class-writer", :kind "defn", :line 38, :end-line 44, :hash "1930453079"}]}
+;; {:version 1, :tested-at "2026-03-13T15:57:40.959496-05:00", :module-hash "-3827559", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 2, :hash "-129056526"} {:id "defn-/class-hierarchy", :kind "defn-", :line 4, :end-line 18, :hash "1296911537"} {:id "defn-/ancestor-chain", :kind "defn-", :line 20, :end-line 27, :hash "-114668316"} {:id "defn-/common-super-class", :kind "defn-", :line 29, :end-line 37, :hash "212174441"} {:id "defn/class-writer", :kind "defn", :line 39, :end-line 45, :hash "1930453079"}]}
 ;; clj-mutate-manifest-end

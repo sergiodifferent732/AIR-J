@@ -46,6 +46,21 @@ The persisted representation is an s-expression tree with a small fixed vocabula
 
 Every source file contains exactly one `module` form.
 
+Modules may optionally declare one host JVM superclass with a canonical host clause:
+
+```lisp
+(module app/sketch
+  (host processing.core.PApplet)
+  ...)
+```
+
+The meaning of `host` is narrow and explicit:
+- the emitted module class extends that Java superclass
+- exported AIR-J functions whose first parameter can accept the host instance become public instance bridge methods
+- those bridge methods delegate into the ordinary static AIR-J implementation with `this` injected as the first argument
+
+This keeps AIR-J internally static and canonical while making it compatible with callback-oriented JVM frameworks such as Processing.
+
 Example:
 
 ```lisp
@@ -85,6 +100,7 @@ Canonicality is a core semantic property, not a formatter preference.
 Rules:
 - each construct has exactly one valid tree shape
 - optional sugar must be removed before persistence
+- host-backed modules use exactly one host clause shape: `(host fully.qualified.JavaClass)`
 - imports are explicit and sorted
 - exported names are explicit and sorted
 - records, enums, and function members appear in fixed field order

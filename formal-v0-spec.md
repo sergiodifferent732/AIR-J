@@ -8,6 +8,7 @@ If this document conflicts with a future ergonomic authoring layer, this documen
 
 Version 0 includes:
 - module declarations
+- optional host-backed module classes for callback-oriented JVM frameworks
 - explicit imports and exports
 - nominal records
 - enums
@@ -56,6 +57,7 @@ Whitespace and comments are not semantically significant.
 
 Reserved head symbols:
 - `module`
+- `host`
 - `imports`
 - `export`
 - `data`
@@ -104,6 +106,7 @@ Persisted v0 AIR-J must be canonical.
 
 Canonicality requirements:
 - every node kind has exactly one persisted shape
+- host-backed modules use exactly one persisted host clause shape
 - all names are fully resolved to their canonical spelling
 - all effect lists are sorted lexicographically
 - imports are sorted lexicographically by module/class and then symbol
@@ -124,7 +127,8 @@ The persisted form is therefore a normalized AST rendered as s-expressions.
 The grammar below is normative for canonical v0 AIR-J.
 
 ```ebnf
-module            ::= "(" "module" module-name imports export decl* ")"
+module            ::= "(" "module" module-name host? imports export decl* ")"
+host              ::= "(" "host" java-class-name ")"
 imports           ::= "(" "imports" import* ")"
 import            ::= airj-import | java-import
 airj-import       ::= "(" "airj" module-name symbol+ ")"

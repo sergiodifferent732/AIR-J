@@ -28,6 +28,45 @@
                          :body {:op :local :name 'x}}]}
                ast)))
 
+  (it "parses a host-backed AIR-J module"
+    (let [source "(module example/hosted
+                    (host java.util.ArrayList)
+                    (imports
+                      (java java.util.ArrayList))
+                    (export snapshot)
+                    (fn snapshot
+                      (params (self (Java java.util.ArrayList)))
+                      (returns Int)
+                      (effects (Foreign.Throw))
+                      (requires true)
+                      (ensures true)
+                      (java/call
+                        (local self)
+                        size
+                        (signature () Int))))"
+          ast (sut/parse-module source)]
+      (should= {:name 'example/hosted
+                :host {:class-name 'java.util.ArrayList}
+                :imports [{:op :java-import
+                           :class-name 'java.util.ArrayList}]
+                :exports ['snapshot]
+                :decls [{:op :fn
+                         :name 'snapshot
+                         :params [{:name 'self
+                                   :type '(Java java.util.ArrayList)}]
+                         :return-type 'Int
+                         :effects ['Foreign.Throw]
+                         :requires [true]
+                         :ensures [true]
+                         :body {:op :java-call
+                                :target {:op :local
+                                         :name 'self}
+                                :member-id 'size
+                                :signature {:params []
+                                            :return-type 'Int}
+                                :args []}}]}
+               ast)))
+
   (it "rejects unsupported declarations"
     (should-throw clojure.lang.ExceptionInfo
                   "Unsupported declaration."

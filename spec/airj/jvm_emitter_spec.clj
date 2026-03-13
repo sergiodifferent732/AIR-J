@@ -63,6 +63,26 @@
           method (.getMethod klass "identity_int" (into-array Class [Integer/TYPE]))]
       (should= 7 (.invoke method nil (object-array [(int 7)])))))
 
+  (it "rejects emission for an unknown local slot"
+    (let [plan {:op :jvm-module
+                :module-name 'example/bad_local
+                :internal-name "example/bad_local"
+                :exports ['broken]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'broken
+                           :owner "example/bad_local"
+                           :params []
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-local
+                                  :name 'missing
+                                  :jvm-type :int}}]}]
+      (should-throw clojure.lang.ExceptionInfo
+                    "Unknown emitted local."
+                    (sut/emit-module-bytes plan))))
+
   (it "emits static AIR-J calls between module methods"
     (let [plan {:op :jvm-module
                 :module-name 'example/calls
@@ -192,6 +212,134 @@
           klass (define-class "example.java_instance" bytes)
           method (.getMethod klass "interop" (into-array Class []))]
       (should= 0 (.invoke method nil (object-array [])))))
+
+  (it "emits Java static field assignment"
+    (let [plan {:op :jvm-module
+                :module-name 'example/java_static_field_write
+                :internal-name "example/java_static_field_write"
+                :exports ['swap]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'swap
+                           :owner "example/java_static_field_write"
+                           :params [{:name 'stream
+                                     :jvm-type "java/io/PrintStream"}]
+                           :return-type "java/io/PrintStream"
+                           :effects ['State.Write]
+                           :body {:op :jvm-seq
+                                  :exprs [{:op :jvm-java-static-set-field
+                                           :class-name "java/lang/System"
+                                           :field-name 'out
+                                           :field-type "java/io/PrintStream"
+                                           :expr {:op :jvm-local
+                                                  :name 'stream
+                                                  :jvm-type "java/io/PrintStream"}
+                                           :jvm-type :void}
+                                          {:op :jvm-java-static-get-field
+                                           :class-name "java/lang/System"
+                                           :field-name 'out
+                                           :field-type "java/io/PrintStream"
+                                           :jvm-type "java/io/PrintStream"}]
+                                  :jvm-type "java/io/PrintStream"}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.java_static_field_write" bytes)
+          method (.getMethod klass "swap" (into-array Class [java.io.PrintStream]))]
+      (should= "example.java_static_field_write" (.getName klass))
+      (should= "swap" (.getName method))))
+
+  (it "emits a host-backed module class with instance bridge methods"
+    (let [plan {:op :jvm-module
+                :module-name 'example/hosted
+                :internal-name "example/hosted"
+                :host {:class-name "java/util/ArrayList"}
+                :exports ['snapshot]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'snapshot
+                           :owner "example/hosted"
+                           :params [{:name 'self
+                                     :jvm-type "java/util/ArrayList"}]
+                           :return-type :int
+                           :effects ['Foreign.Throw]
+                           :body {:op :jvm-java-call
+                                  :target {:op :jvm-local
+                                           :name 'self
+                                           :jvm-type "java/util/ArrayList"}
+                                  :member-id 'size
+                                  :parameter-types []
+                                  :return-type :int
+                                  :args []
+                                  :jvm-type :int}}]
+                :instance-methods [{:name 'snapshot
+                                    :owner "example/hosted"
+                                    :params []
+                                    :return-type :int
+                                    :target {:name 'snapshot
+                                             :owner "example/hosted"
+                                             :parameter-types ["java/util/ArrayList"]
+                                             :return-type :int}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.hosted" bytes)
+          ctor (.getConstructor klass (into-array Class []))
+          instance (.newInstance ctor (object-array []))
+          add-method (.getMethod klass "add" (into-array Class [Object]))
+          snapshot-method (.getMethod klass "snapshot" (into-array Class []))]
+      (.invoke add-method instance (object-array ["a"]))
+      (.invoke add-method instance (object-array ["b"]))
+      (should= 2 (.invoke snapshot-method instance (object-array [])))
+      (should= java.util.ArrayList (.getSuperclass klass))))
+
+  (it "emits host-backed instance bridge methods with parameters"
+    (let [plan {:op :jvm-module
+                :module-name 'example/hosted_args
+                :internal-name "example/hosted_args"
+                :host {:class-name "java/util/ArrayList"}
+                :exports ['snapshot_plus]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'snapshot_plus
+                           :owner "example/hosted_args"
+                           :params [{:name 'self
+                                     :jvm-type "java/util/ArrayList"}
+                                    {:name 'delta
+                                     :jvm-type :int}]
+                           :return-type :int
+                           :effects ['Foreign.Throw]
+                           :body {:op :jvm-int-add
+                                  :args [{:op :jvm-java-call
+                                          :target {:op :jvm-local
+                                                   :name 'self
+                                                   :jvm-type "java/util/ArrayList"}
+                                          :member-id 'size
+                                          :parameter-types []
+                                          :return-type :int
+                                          :args []
+                                          :jvm-type :int}
+                                         {:op :jvm-local
+                                          :name 'delta
+                                          :jvm-type :int}]
+                                  :jvm-type :int}}]
+                :instance-methods [{:name 'snapshot_plus
+                                    :owner "example/hosted_args"
+                                    :params [{:name 'delta
+                                              :jvm-type :int}]
+                                    :return-type :int
+                                    :target {:name 'snapshot_plus
+                                             :owner "example/hosted_args"
+                                             :parameter-types ["java/util/ArrayList" :int]
+                                             :return-type :int}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.hosted_args" bytes)
+          ctor (.getConstructor klass (into-array Class []))
+          instance (.newInstance ctor (object-array []))
+          add-method (.getMethod klass "add" (into-array Class [Object]))
+          snapshot-plus-method (.getMethod klass "snapshot_plus" (into-array Class [Integer/TYPE]))]
+      (.invoke add-method instance (object-array ["earth"]))
+      (.invoke add-method instance (object-array ["mars"]))
+      (should= 7 (.invoke snapshot-plus-method instance (object-array [(int 5)])))))
 
   (it "emits simple boolean conditionals"
     (let [plan {:op :jvm-module
@@ -491,6 +639,35 @@
           method (.getMethod klass "metric" (into-array Class [String]))]
       (should= 2 (.invoke method nil (object-array [" a,bb "])))
       (should= 0 (.invoke method nil (object-array ["   "])))))
+
+  (it "emits sequence length primitives"
+    (let [plan {:op :jvm-module
+                :module-name 'example/seq_length
+                :internal-name "example/seq_length"
+                :exports ['count_parts]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'count_parts
+                           :owner "example/seq_length"
+                           :params [{:name 'line :jvm-type "java/lang/String"}]
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-seq-length
+                                  :arg {:op :jvm-string-split-on
+                                        :args [{:op :jvm-local
+                                                :name 'line
+                                                :jvm-type "java/lang/String"}
+                                               {:op :jvm-string
+                                                :value ","
+                                                :jvm-type "java/lang/String"}]
+                                        :jvm-type "[Ljava/lang/String;"}
+                                  :jvm-type :int}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.seq_length" bytes)
+          method (.getMethod klass "count_parts" (into-array Class [String]))]
+      (should= 3 (.invoke method nil (object-array ["a,b,c"])))
+      (should= 1 (.invoke method nil (object-array ["solo"])))))
 
   (it "emits substring char-at and first/empty sequence primitives"
     (let [plan {:op :jvm-module

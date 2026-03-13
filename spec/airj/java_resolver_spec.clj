@@ -93,6 +93,30 @@
                     "Missing Java import."
                     (sut/check-module module))))
 
+  (it "rejects missing java imports for host classes"
+    (let [module {:name 'example/hosted
+                  :host {:class-name 'java.util.ArrayList}
+                  :imports []
+                  :exports ['snapshot]
+                  :decls [{:op :fn
+                           :name 'snapshot
+                           :params [{:name 'self
+                                     :type '(Java java.util.ArrayList)}]
+                           :return-type 'Int
+                           :effects ['Foreign.Throw]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :java-call
+                                  :target {:op :local
+                                           :name 'self}
+                                  :member-id 'size
+                                  :signature {:params []
+                                              :return-type 'Int}
+                                  :args []}}]}]
+      (should-throw clojure.lang.ExceptionInfo
+                    "Missing Java import."
+                    (sut/check-module module))))
+
   (it "rejects unresolved java methods"
     (let [module {:name 'example/bad-method
                   :imports [{:op :java-import

@@ -72,6 +72,55 @@
                                           :jvm-type :int}]}}]}
                (sut/lower-module module))))
 
+  (it "lowers host-backed exported functions into instance bridge methods"
+    (let [module {:name 'example/hosted
+                  :host {:class-name 'java.util.ArrayList}
+                  :imports [{:op :java-import
+                             :class-name 'java.util.ArrayList}]
+                  :exports ['snapshot]
+                  :decls [{:op :fn
+                           :name 'snapshot
+                           :params [{:name 'self
+                                     :type '(Java java.util.ArrayList)}]
+                           :return-type 'Int
+                           :effects ['Foreign.Throw]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :java-call
+                                  :target {:op :local
+                                           :name 'self}
+                                  :member-id 'size
+                                  :signature {:params []
+                                              :return-type 'Int}
+                                  :args []}}]}]
+      (should= {:class-name "java/util/ArrayList"}
+               (:host (sut/lower-module module)))
+      (should= [{:name 'snapshot
+                 :owner "example/hosted"
+                 :params [{:name 'self
+                           :jvm-type "java/util/ArrayList"}]
+                 :return-type :int
+                 :effects ['Foreign.Throw]
+                 :body {:op :jvm-java-call
+                        :target {:op :jvm-local
+                                 :name 'self
+                                 :jvm-type "java/util/ArrayList"}
+                        :member-id 'size
+                        :parameter-types []
+                        :return-type :int
+                        :args []
+                        :jvm-type :int}}]
+               (:methods (sut/lower-module module)))
+      (should= [{:name 'snapshot
+                 :owner "example/hosted"
+                 :params []
+                 :return-type :int
+                 :target {:name 'snapshot
+                          :owner "example/hosted"
+                          :parameter-types ["java/util/ArrayList"]
+                          :return-type :int}}]
+               (:instance-methods (sut/lower-module module))))))
+
   (it "lowers instance java calls and fields into JVM plan nodes"
     (let [module {:name 'example/java_instance
                   :imports []
@@ -1904,4 +1953,4 @@
                                                   :value 0
                                                   :jvm-type :int}}]
                                   :jvm-type :int}}]}
-               (sut/lower-module module)))))
+               (sut/lower-module module))))
