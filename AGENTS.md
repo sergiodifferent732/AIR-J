@@ -38,8 +38,9 @@ clj -M:check-structure spec
 ## Mutation testing
 
 - Use `clj-mutate` to keep modules covered and overloaded with tests.
-- `clj-mutate --scan` is the fast structural prepass.
-- Use `clj -M:mutate src/.../file.clj --scan` first on changed files to see total mutation count, changed mutation count, and any mutation-count warning before running coverage/spec-backed mutation work.
+- `clj-mutate --scan` is an optional fast structural prepass.
+- The normal mutation run now reports total mutation count, covered/uncovered counts, changed mutation count, manifest presence, module-hash status, and differential surface area at the top of the run.
+- Use `clj -M:mutate src/.../file.clj --scan` only when you want a quick structural read without running the full coverage/spec-backed mutation work.
 - Run mutation testing against the source file you changed.
 - `clj-mutate` now defaults to differential mutation once a file already has an embedded footer manifest.
 - That means `clj -M:mutate src/.../file.clj --max-workers 3` is usually a changed-top-level-forms run on previously mutated files.
@@ -103,15 +104,14 @@ Do not consider a change complete until all applicable checks pass:
 2. `clj -M:spec`
 3. `clj -M:cov`
 4. `clj -M:crap`
-5. `clj -M:mutate src/.../changed_file.clj --scan`
-6. `clj -M:mutate src/.../changed_file.clj`
-7. `clj -M:check-dependencies`
+5. `clj -M:mutate src/.../changed_file.clj`
+6. `clj -M:check-dependencies`
 
 ## Tooling pinned in `deps.edn`
 
 Current pinned SHAs:
 
-- `clj-mutate`: `0abec037f3d7f103aea031ba92c6f93c9f0252fb`
+- `clj-mutate`: `5f8262718d1a2791cc89424036d4fb4e7007ff91`
 - `dependency-checker`: `e8f35792434adb35fb6b99f5c3f9ab2ab24a0279`
 - `speclj-structure-check`: `7cc804c4e99b3482ca1d8a26b735ed41751a03ab`
 - `crap4clj`: `9f12da1b09bc1177f8f058108cf22a73bc9a97a0`
