@@ -7,6 +7,7 @@
     (let [ctx {:module-name 'example/types
                :decls {'Result {:op :union
                                 :name 'Result
+                                :type-params ['Ok 'Err]
                                 :variants []}}}]
       (should= :int
                (sut/lower-type 'Int ctx))
@@ -15,7 +16,42 @@
       (should= "java/lang/StringBuilder"
                (sut/lower-type '(Java java.lang.StringBuilder) ctx))
       (should= "example/types$Result"
-               (sut/lower-type 'Result ctx))))
+               (sut/lower-type 'Result ctx))
+      (should= "example/types$Result"
+               (sut/lower-type '(Result Int String) ctx))))
+
+  (it "instantiates parameterized union fields from type arguments"
+    (let [decl {:op :union
+                :name 'Result
+                :type-params ['Ok 'Err]
+                :variants [{:name 'Ok
+                            :fields [{:name 'value
+                                      :type 'Ok}]}
+                           {:name 'Err
+                            :fields [{:name 'error
+                                      :type 'Err}]}]}]
+      (should= 'Int
+               (sut/field-type {:name 'Box
+                                :type-params ['T]
+                                :fields [{:name 'value
+                                          :type 'T}]}
+                               'value
+                               '(Box Int)))
+      (should= [{:name 'value
+                 :type 'Int}]
+               (:fields (sut/union-variant {:decls {'Result decl}}
+                                           '(Result Int String)
+                                           'Ok)))))
+
+  (it "instantiates lowered type parameters through symbols lists and literals"
+    (let [instantiate-type (ns-resolve 'airj.jvm-lowerer-types 'instantiate-type)]
+      (should= 'Int
+               (instantiate-type 'T {'T 'Int}))
+      (should= '(Result Int String)
+               (instantiate-type '(Result T E) {'T 'Int
+                                                'E 'String}))
+      (should= :int
+               (instantiate-type :int {'T 'Int}))))
 
   (it "infers call types from imported function declarations"
     (let [ctx {:module-name 'example/use

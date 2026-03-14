@@ -1,5 +1,11 @@
 (ns airj.jvm-lowerer-match)
 
+(defn- declared-type-root
+  [type-expr]
+  (if (seq? type-expr)
+    (first type-expr)
+    type-expr))
+
 (defn- union-pattern-bindings
   [target-expr target-type pattern ctx {:keys [union-variant union-variant-class-name lower-type]}]
   (let [variant (union-variant ctx target-type (:name pattern))]
@@ -10,7 +16,7 @@
                     :expr {:op :jvm-variant-field
                            :target target-expr
                            :class-name (union-variant-class-name (:module-name ctx)
-                                                                 target-type
+                                                                 (declared-type-root target-type)
                                                                  (:name pattern))
                            :field (:name field)
                            :jvm-type (lower-type (:type field) ctx)}})))
@@ -29,7 +35,7 @@
                     {:op :jvm-instance-of
                      :target target-expr
                      :class-name (union-variant-class-name (:module-name ctx)
-                                                           target-type
+                                                           (declared-type-root target-type)
                                                            (:name pattern))})})
 
 (defn- lower-match-test
@@ -123,5 +129,5 @@
             (rest case-types))))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-12T17:24:52.912471-05:00", :module-hash "822701811", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 1, :hash "-1354362744"} {:id "defn-/union-pattern-bindings", :kind "defn-", :line 3, :end-line 17, :hash "-1662704550"} {:id "def/match-test-handlers", :kind "def", :line 19, :end-line 33, :hash "1776137895"} {:id "defn-/lower-match-test", :kind "defn-", :line 35, :end-line 40, :hash "-1940850032"} {:id "def/match-bindings-handlers", :kind "def", :line 42, :end-line 51, :hash "1924692997"} {:id "defn-/lower-match-bindings", :kind "defn-", :line 53, :end-line 58, :hash "1676543692"} {:id "defn-/bind-union-pattern-locals", :kind "defn-", :line 60, :end-line 69, :hash "-732885566"} {:id "def/pattern-locals-handlers", :kind "def", :line 71, :end-line 78, :hash "-1926538894"} {:id "defn-/bind-pattern-locals", :kind "defn-", :line 80, :end-line 85, :hash "-1123562195"} {:id "defn-/lower-match-case", :kind "defn-", :line 87, :end-line 93, :hash "643897326"} {:id "defn/lower-match", :kind "defn", :line 95, :end-line 104, :hash "1290726234"} {:id "defn/infer-match-type", :kind "defn", :line 106, :end-line 123, :hash "-1349003900"}]}
+;; {:version 1, :tested-at "2026-03-13T21:57:55.322673-05:00", :module-hash "-1120684436", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 1, :hash "-1354362744"} {:id "defn-/declared-type-root", :kind "defn-", :line 3, :end-line 7, :hash "-1385718868"} {:id "defn-/union-pattern-bindings", :kind "defn-", :line 9, :end-line 23, :hash "-405965114"} {:id "def/match-test-handlers", :kind "def", :line 25, :end-line 39, :hash "11619883"} {:id "defn-/lower-match-test", :kind "defn-", :line 41, :end-line 46, :hash "-1940850032"} {:id "def/match-bindings-handlers", :kind "def", :line 48, :end-line 57, :hash "1924692997"} {:id "defn-/lower-match-bindings", :kind "defn-", :line 59, :end-line 64, :hash "1676543692"} {:id "defn-/bind-union-pattern-locals", :kind "defn-", :line 66, :end-line 75, :hash "-732885566"} {:id "def/pattern-locals-handlers", :kind "def", :line 77, :end-line 84, :hash "-1926538894"} {:id "defn-/bind-pattern-locals", :kind "defn-", :line 86, :end-line 91, :hash "-1123562195"} {:id "defn-/lower-match-case", :kind "defn-", :line 93, :end-line 99, :hash "643897326"} {:id "defn/lower-match", :kind "defn", :line 101, :end-line 110, :hash "-1952399672"} {:id "defn/infer-match-type", :kind "defn", :line 112, :end-line 129, :hash "-1349003900"}]}
 ;; clj-mutate-manifest-end

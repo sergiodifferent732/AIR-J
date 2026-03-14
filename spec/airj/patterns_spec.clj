@@ -77,6 +77,36 @@
                                        :fail! (fn [message data]
                                                 (throw (ex-info message data)))})))
 
+    (it "fails for union patterns against non-union targets"
+      (should-throw clojure.lang.ExceptionInfo
+                    (sut/bind-pattern {:locals {}}
+                                      {:op :union-pattern
+                                       :name 'Ok
+                                       :args []}
+                                      'Record
+                                      decls
+                                      {:bind-binder (fn [ctx _pattern _target-type _decls] ctx)
+                                       :bind-literal (fn [ctx _pattern _target-type] ctx)
+                                       :fail! (fn [message data]
+                                                (throw (ex-info message data)))})))
+
+    (it "fails for union pattern arity mismatches"
+      (should-throw clojure.lang.ExceptionInfo
+                    (sut/bind-pattern {:locals {}}
+                                      {:op :union-pattern
+                                       :name 'Ok
+                                       :args [{:op :binder-pattern
+                                               :name 'value}
+                                              {:op :binder-pattern
+                                               :name 'extra}]}
+                                      'Response
+                                      decls
+                                      {:bind-binder (fn [ctx pattern target-type _decls]
+                                                      (assoc-in ctx [:locals (:name pattern)] target-type))
+                                       :bind-literal (fn [ctx _pattern _target-type] ctx)
+                                       :fail! (fn [message data]
+                                                (throw (ex-info message data)))})))
+
     (it "fails for unknown record fields"
       (should-throw clojure.lang.ExceptionInfo
                     (sut/bind-pattern {:locals {}}
@@ -90,4 +120,65 @@
                                       {:bind-binder (fn [ctx _pattern _target-type _decls] ctx)
                                        :bind-literal (fn [ctx _pattern _target-type] ctx)
                                        :fail! (fn [message data]
-                                                (throw (ex-info message data)))})))))
+                                                (throw (ex-info message data)))})))
+
+    (it "fails for record pattern type mismatches"
+      (should-throw clojure.lang.ExceptionInfo
+                    (sut/bind-pattern {:locals {}}
+                                      {:op :record-pattern
+                                       :type 'Response
+                                       :fields []}
+                                      'Record
+                                      decls
+                                      {:bind-binder (fn [ctx _pattern _target-type _decls] ctx)
+                                       :bind-literal (fn [ctx _pattern _target-type] ctx)
+                                       :fail! (fn [message data]
+                                                (throw (ex-info message data)))})))
+
+    (it "fails for record patterns against non-record targets"
+      (should-throw clojure.lang.ExceptionInfo
+                    (sut/bind-pattern {:locals {}}
+                                      {:op :record-pattern
+                                       :type 'Color
+                                       :fields []}
+                                      'Color
+                                      decls
+                                      {:bind-binder (fn [ctx _pattern _target-type _decls] ctx)
+                                       :bind-literal (fn [ctx _pattern _target-type] ctx)
+                                       :fail! (fn [message data]
+                                                (throw (ex-info message data)))})))
+
+    (it "fails for unsupported pattern shapes"
+      (should-throw clojure.lang.ExceptionInfo
+                    (sut/bind-pattern {:locals {}}
+                                      {:op :unsupported}
+                                      'Response
+                                      decls
+                                      {:bind-binder (fn [ctx _pattern _target-type _decls] ctx)
+                                       :bind-literal (fn [ctx _pattern _target-type] ctx)
+                                       :fail! (fn [message data]
+                                                (throw (ex-info message data)))})))
+
+    (it "instantiates parameterized pattern helpers"
+      (let [result-decl {:op :union
+                         :name 'Result
+                         :type-params ['Ok 'Err]
+                         :variants [{:name 'Ok
+                                     :fields [{:name 'value :type 'Ok}]}
+                                    {:name 'Err
+                                     :fields [{:name 'error :type 'Err}]}]}]
+        (should= 'Int
+                 (sut/instantiate-type 'T {'T 'Int}))
+        (should= '(Result Int String)
+                 (sut/instantiate-type '(Result T E) {'T 'Int
+                                                      'E 'String}))
+        (should= [{:name 'value
+                   :type 'Int}]
+                 (:fields (sut/union-variant result-decl 'Ok '(Result Int String))))
+        (should= 'String
+                 (sut/field-type {:name 'Box
+                                  :type-params ['T]
+                                  :fields [{:name 'value
+                                            :type 'T}]}
+                                 'value
+                                 '(Box String)))))))

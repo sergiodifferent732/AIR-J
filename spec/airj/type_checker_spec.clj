@@ -1101,3 +1101,40 @@
                            :invariants [{:op :local :name 'value}]}
                           ctx
                           {}))))
+
+  (it "type-checks parameterized Result variants and match bindings"
+    (let [module {:name 'example/result
+                  :imports []
+                  :exports ['unwrap]
+                  :decls [{:op :union
+                           :name 'Result
+                           :type-params ['Ok 'Err]
+                           :invariants []
+                           :variants [{:name 'Ok
+                                       :fields [{:name 'value
+                                                 :type 'Ok}]}
+                                      {:name 'Err
+                                       :fields [{:name 'error
+                                                 :type 'Err}]}]}
+                          {:op :fn
+                           :name 'unwrap
+                           :params [{:name 'result
+                                     :type '(Result Int String)}]
+                           :return-type 'Int
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :match
+                                  :target {:op :local :name 'result}
+                                  :cases [{:pattern {:op :union-pattern
+                                                     :name 'Ok
+                                                     :args [{:op :binder-pattern
+                                                             :name 'value}]}
+                                           :body {:op :local :name 'value}}
+                                          {:pattern {:op :union-pattern
+                                                     :name 'Err
+                                                     :args [{:op :binder-pattern
+                                                             :name 'message}]}
+                                           :body 0}]}}]}]
+      (should= module
+               (sut/check-module module))))
