@@ -31,4 +31,38 @@
                 :callee {:op :local :name 'tick}
                 :args [1]}]
       (should= 'Int
-               (sut/infer-type expr ctx)))))
+               (sut/infer-type expr ctx))))
+
+  (it "infers Float and Double literals"
+    (let [ctx {:module-name 'example/literals
+               :decls {}
+               :locals {}}]
+      (should= 'Float
+               (sut/infer-type (float 1.25) ctx))
+      (should= 'Double
+               (sut/infer-type 1.25 ctx))))
+
+  (it "rejects unsupported JVM types"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Unsupported JVM type."
+                  (sut/lower-type 'MissingType)))
+
+  (it "rejects unknown lowered locals"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Unknown lowered local."
+                  (sut/local-type {:locals {}} 'missing)))
+
+  (it "rejects unknown lowered fields"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Unknown lowered field."
+                  (sut/field-type {:name 'Response
+                                   :fields [{:name 'status
+                                             :type 'Int}]}
+                                  'missing)))
+
+  (it "rejects mismatched lowered branch types"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Lowered branch types must agree."
+                  (sut/join-branch-types :int
+                                         :boolean
+                                         {:expr :if}))))

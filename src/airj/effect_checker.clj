@@ -230,6 +230,24 @@
    :int-le (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
    :int-gt (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
    :int-ge (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :float-add (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :float-sub (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :float-mul (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :float-div (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :float-eq (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :float-lt (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :float-le (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :float-gt (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :float-ge (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :double-add (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :double-sub (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :double-mul (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :double-div (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :double-eq (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :double-lt (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :double-le (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :double-gt (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
+   :double-ge (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
    :bool-eq (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
    :int-ne (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
    :string-eq (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
@@ -238,6 +256,10 @@
    :string-char-at (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
    :string-substring (fn [expr ctx walk] (effect-union (:args expr) ctx walk))
    :int->string (fn [expr ctx walk] (walk (:arg expr) ctx))
+   :int->float (fn [expr ctx walk] (walk (:arg expr) ctx))
+   :int->double (fn [expr ctx walk] (walk (:arg expr) ctx))
+   :float->double (fn [expr ctx walk] (walk (:arg expr) ctx))
+   :double->float (fn [expr ctx walk] (walk (:arg expr) ctx))
    :string->int (fn [expr ctx walk]
                   (set/union #{'Foreign.Throw}
                              (walk (:arg expr) ctx)))
@@ -409,5 +431,5 @@
     module))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-13T14:45:31.442651-05:00", :module-hash "-1224135817", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 9, :hash "-1748354227"} {:id "defn-/fail!", :kind "defn-", :line 11, :end-line 13, :hash "1619150228"} {:id "defn-/decl-map", :kind "defn-", :line 15, :end-line 17, :hash "1732448350"} {:id "defn-/fn-type", :kind "defn-", :line 19, :end-line 24, :hash "1095575499"} {:id "defn-/module-fn-env", :kind "defn-", :line 26, :end-line 43, :hash "812924858"} {:id "defn-/ensure-subset", :kind "defn-", :line 45, :end-line 52, :hash "736755596"} {:id "defn-/make-ctx", :kind "defn-", :line 54, :end-line 67, :hash "-1033196036"} {:id "defn-/bind-call-effects", :kind "defn-", :line 69, :end-line 71, :hash "-198491742"} {:id "defn-/bind-local", :kind "defn-", :line 73, :end-line 75, :hash "1658319653"} {:id "defn-/bind-pattern-local", :kind "defn-", :line 77, :end-line 79, :hash "-357983377"} {:id "defn-/bind-pattern-locals", :kind "defn-", :line 81, :end-line 89, :hash "-954573492"} {:id "form/11/declare", :kind "declare", :line 91, :end-line 91, :hash "1302116001"} {:id "defn-/local-callable-effects", :kind "defn-", :line 93, :end-line 102, :hash "75363154"} {:id "defn-/if-callable-effects", :kind "defn-", :line 104, :end-line 109, :hash "765082213"} {:id "defn-/callable-effects", :kind "defn-", :line 111, :end-line 126, :hash "138662341"} {:id "defn-/binding-call-effects", :kind "defn-", :line 128, :end-line 130, :hash "1627316679"} {:id "defn-/effect-union", :kind "defn-", :line 132, :end-line 134, :hash "25526879"} {:id "defn-/call-effects", :kind "defn-", :line 136, :end-line 140, :hash "899417580"} {:id "defn-/lambda-effects", :kind "defn-", :line 142, :end-line 152, :hash "-660105978"} {:id "defn-/try-effects", :kind "defn-", :line 154, :end-line 165, :hash "-700469701"} {:id "defn-/binding-ctx", :kind "defn-", :line 167, :end-line 173, :hash "542892397"} {:id "defn-/let-effects", :kind "defn-", :line 175, :end-line 187, :hash "-1106430720"} {:id "defn-/seq-effects", :kind "defn-", :line 189, :end-line 201, :hash "-1853656406"} {:id "defn-/loop-effects", :kind "defn-", :line 203, :end-line 215, :hash "1753178605"} {:id "defn-/expr-effect-handlers", :kind "defn-", :line 217, :end-line 350, :hash "-1251425092"} {:id "defn/expr-effects*", :kind "defn", :line 352, :end-line 355, :hash "1640622703"} {:id "defn/expr-effects", :kind "defn", :line 357, :end-line 360, :hash "-425404032"} {:id "defn-/check-contracts", :kind "defn-", :line 362, :end-line 368, :hash "-190924871"} {:id "defn-/invariant-ctx", :kind "defn-", :line 370, :end-line 378, :hash "-1341369256"} {:id "defn-/check-invariants", :kind "defn-", :line 380, :end-line 386, :hash "-1140560710"} {:id "defn-/check-fn-decl", :kind "defn-", :line 388, :end-line 397, :hash "254737222"} {:id "defn/check-module", :kind "defn", :line 399, :end-line 409, :hash "1481191546"}]}
+;; {:version 1, :tested-at "2026-03-13T16:36:10.700404-05:00", :module-hash "-467492861", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 9, :hash "-1748354227"} {:id "defn-/fail!", :kind "defn-", :line 11, :end-line 13, :hash "1619150228"} {:id "defn-/decl-map", :kind "defn-", :line 15, :end-line 17, :hash "1732448350"} {:id "defn-/fn-type", :kind "defn-", :line 19, :end-line 24, :hash "1095575499"} {:id "defn-/module-fn-env", :kind "defn-", :line 26, :end-line 43, :hash "812924858"} {:id "defn-/ensure-subset", :kind "defn-", :line 45, :end-line 52, :hash "736755596"} {:id "defn-/make-ctx", :kind "defn-", :line 54, :end-line 67, :hash "-1033196036"} {:id "defn-/bind-call-effects", :kind "defn-", :line 69, :end-line 71, :hash "-198491742"} {:id "defn-/bind-local", :kind "defn-", :line 73, :end-line 75, :hash "1658319653"} {:id "defn-/bind-pattern-local", :kind "defn-", :line 77, :end-line 79, :hash "-357983377"} {:id "defn-/bind-pattern-locals", :kind "defn-", :line 81, :end-line 89, :hash "-954573492"} {:id "form/11/declare", :kind "declare", :line 91, :end-line 91, :hash "1302116001"} {:id "defn-/local-callable-effects", :kind "defn-", :line 93, :end-line 102, :hash "75363154"} {:id "defn-/if-callable-effects", :kind "defn-", :line 104, :end-line 109, :hash "765082213"} {:id "defn-/callable-effects", :kind "defn-", :line 111, :end-line 126, :hash "138662341"} {:id "defn-/binding-call-effects", :kind "defn-", :line 128, :end-line 130, :hash "1627316679"} {:id "defn-/effect-union", :kind "defn-", :line 132, :end-line 134, :hash "25526879"} {:id "defn-/call-effects", :kind "defn-", :line 136, :end-line 140, :hash "899417580"} {:id "defn-/lambda-effects", :kind "defn-", :line 142, :end-line 152, :hash "-660105978"} {:id "defn-/try-effects", :kind "defn-", :line 154, :end-line 165, :hash "-700469701"} {:id "defn-/binding-ctx", :kind "defn-", :line 167, :end-line 173, :hash "542892397"} {:id "defn-/let-effects", :kind "defn-", :line 175, :end-line 187, :hash "-1106430720"} {:id "defn-/seq-effects", :kind "defn-", :line 189, :end-line 201, :hash "-1853656406"} {:id "defn-/loop-effects", :kind "defn-", :line 203, :end-line 215, :hash "1753178605"} {:id "defn-/expr-effect-handlers", :kind "defn-", :line 217, :end-line 372, :hash "-1415835408"} {:id "defn/expr-effects*", :kind "defn", :line 374, :end-line 377, :hash "1640622703"} {:id "defn/expr-effects", :kind "defn", :line 379, :end-line 382, :hash "-425404032"} {:id "defn-/check-contracts", :kind "defn-", :line 384, :end-line 390, :hash "-190924871"} {:id "defn-/invariant-ctx", :kind "defn-", :line 392, :end-line 400, :hash "-1341369256"} {:id "defn-/check-invariants", :kind "defn-", :line 402, :end-line 408, :hash "-1140560710"} {:id "defn-/check-fn-decl", :kind "defn-", :line 410, :end-line 419, :hash "254737222"} {:id "defn/check-module", :kind "defn", :line 421, :end-line 431, :hash "1481191546"}]}
 ;; clj-mutate-manifest-end

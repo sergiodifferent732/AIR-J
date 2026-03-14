@@ -3,6 +3,16 @@
             [speclj.core :refer :all]))
 
 (describe "JVM lowerer expr"
+  (it "lowers Float and Double literals"
+    (should= {:op :jvm-float
+              :value (float 1.25)
+              :jvm-type :float}
+             (sut/lower-expr (float 1.25) {}))
+    (should= {:op :jvm-double
+              :value 1.25
+              :jvm-type :double}
+             (sut/lower-expr 1.25 {})))
+
   (it "lowers direct imported function calls"
     (let [ctx {:module-name 'example/use
                :decls {}

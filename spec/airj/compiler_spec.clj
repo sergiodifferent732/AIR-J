@@ -206,6 +206,28 @@
       (should= true (.invoke method nil (object-array [(int 4) (int 4)])))
       (should= false (.invoke method nil (object-array [(int 2) (int 9)])))))
 
+  (it "compiles AIR-J source with floating-point operators and Java double interop"
+    (let [source "(module example/floating
+                    (imports
+                      (java java.lang.Math))
+                    (export orbit-step)
+                    (fn orbit-step
+                      (params (phase Double) (scale Float))
+                      (returns Float)
+                      (effects (Foreign.Throw))
+                      (requires true)
+                      (ensures true)
+                      (double->float
+                        (double-add
+                          (java/static-call java.lang.Math cos (signature (Double) Double) (local phase))
+                          (float->double
+                            (float-div (local scale) (int->float 2)))))))"
+          bundle (sut/compile-source source)
+          klass (define-class "example.floating" (get bundle "example/floating"))
+          method (.getMethod klass "orbit_step" (into-array Class [Double/TYPE Float/TYPE]))
+          result (.invoke method nil (object-array [(double 0.0) (float 4.0)]))]
+      (should (< (Math/abs (- (double result) 3.0)) 1.0e-5))))
+
   (it "compiles AIR-J source with conversion equality and stdout output"
     (let [source "(module example/io-ops
                     (imports)

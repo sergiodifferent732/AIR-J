@@ -7,22 +7,32 @@
 (declare lower-expr)
 (declare lower-param)
 
-(defn lower-literal
+(defn- lower-floating-literal
   [expr]
   (cond
-    (integer? expr) {:op :jvm-int
-                     :value expr
-                     :jvm-type :int}
-    (string? expr) {:op :jvm-string
-                    :value expr
-                    :jvm-type "java/lang/String"}
-    (true? expr) {:op :jvm-boolean
-                  :value true
-                  :jvm-type :boolean}
-    (false? expr) {:op :jvm-boolean
-                   :value false
-                   :jvm-type :boolean}
+    (instance? Float expr) {:op :jvm-float
+                            :value expr
+                            :jvm-type :float}
+    (instance? Double expr) {:op :jvm-double
+                             :value expr
+                             :jvm-type :double}
     :else nil))
+
+(defn lower-literal
+  [expr]
+  (or (when (integer? expr)
+        {:op :jvm-int
+         :value expr
+         :jvm-type :int})
+      (lower-floating-literal expr)
+      (when (string? expr)
+        {:op :jvm-string
+         :value expr
+         :jvm-type "java/lang/String"})
+      (when (or (true? expr) (false? expr))
+        {:op :jvm-boolean
+         :value (boolean expr)
+         :jvm-type :boolean})))
 
 (defn- local-callee-name
   [callee]
@@ -365,6 +375,24 @@
    :int-le (fn [expr ctx] (lower-primitive-binary :jvm-int-le expr ctx :boolean))
    :int-gt (fn [expr ctx] (lower-primitive-binary :jvm-int-gt expr ctx :boolean))
    :int-ge (fn [expr ctx] (lower-primitive-binary :jvm-int-ge expr ctx :boolean))
+   :float-add (fn [expr ctx] (lower-primitive-binary :jvm-float-add expr ctx :float))
+   :float-sub (fn [expr ctx] (lower-primitive-binary :jvm-float-sub expr ctx :float))
+   :float-mul (fn [expr ctx] (lower-primitive-binary :jvm-float-mul expr ctx :float))
+   :float-div (fn [expr ctx] (lower-primitive-binary :jvm-float-div expr ctx :float))
+   :float-eq (fn [expr ctx] (lower-primitive-binary :jvm-float-eq expr ctx :boolean))
+   :float-lt (fn [expr ctx] (lower-primitive-binary :jvm-float-lt expr ctx :boolean))
+   :float-le (fn [expr ctx] (lower-primitive-binary :jvm-float-le expr ctx :boolean))
+   :float-gt (fn [expr ctx] (lower-primitive-binary :jvm-float-gt expr ctx :boolean))
+   :float-ge (fn [expr ctx] (lower-primitive-binary :jvm-float-ge expr ctx :boolean))
+   :double-add (fn [expr ctx] (lower-primitive-binary :jvm-double-add expr ctx :double))
+   :double-sub (fn [expr ctx] (lower-primitive-binary :jvm-double-sub expr ctx :double))
+   :double-mul (fn [expr ctx] (lower-primitive-binary :jvm-double-mul expr ctx :double))
+   :double-div (fn [expr ctx] (lower-primitive-binary :jvm-double-div expr ctx :double))
+   :double-eq (fn [expr ctx] (lower-primitive-binary :jvm-double-eq expr ctx :boolean))
+   :double-lt (fn [expr ctx] (lower-primitive-binary :jvm-double-lt expr ctx :boolean))
+   :double-le (fn [expr ctx] (lower-primitive-binary :jvm-double-le expr ctx :boolean))
+   :double-gt (fn [expr ctx] (lower-primitive-binary :jvm-double-gt expr ctx :boolean))
+   :double-ge (fn [expr ctx] (lower-primitive-binary :jvm-double-ge expr ctx :boolean))
    :bool-eq (fn [expr ctx] (lower-primitive-binary :jvm-bool-eq expr ctx :boolean))
    :int-ne (fn [expr ctx] (lower-primitive-binary :jvm-int-ne expr ctx :boolean))
    :string-eq (fn [expr ctx] (lower-primitive-binary :jvm-string-eq expr ctx :boolean))
@@ -376,6 +404,10 @@
                         :args (mapv #(lower-expr % ctx) (:args expr))
                         :jvm-type "java/lang/String"})
    :int->string (fn [expr ctx] (lower-primitive-unary :jvm-int->string expr ctx "java/lang/String"))
+   :int->float (fn [expr ctx] (lower-primitive-unary :jvm-int->float expr ctx :float))
+   :int->double (fn [expr ctx] (lower-primitive-unary :jvm-int->double expr ctx :double))
+   :float->double (fn [expr ctx] (lower-primitive-unary :jvm-float->double expr ctx :double))
+   :double->float (fn [expr ctx] (lower-primitive-unary :jvm-double->float expr ctx :float))
    :string->int (fn [expr ctx] (lower-primitive-unary :jvm-string->int expr ctx :int))
    :string-length (fn [expr ctx] (lower-primitive-unary :jvm-string-length expr ctx :int))
    :string-trim (fn [expr ctx] (lower-primitive-unary :jvm-string-trim expr ctx "java/lang/String"))
@@ -433,5 +465,5 @@
    :jvm-type (types/lower-type (:type param) ctx)})
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-13T14:48:50.310013-05:00", :module-hash "-511211784", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 5, :hash "-816319332"} {:id "form/1/declare", :kind "declare", :line 7, :end-line 7, :hash "-1588192225"} {:id "form/2/declare", :kind "declare", :line 8, :end-line 8, :hash "-350471521"} {:id "defn/lower-literal", :kind "defn", :line 10, :end-line 25, :hash "1026711281"} {:id "defn-/local-callee-name", :kind "defn-", :line 27, :end-line 30, :hash "291537367"} {:id "defn-/lower-local", :kind "defn-", :line 32, :end-line 48, :hash "-672533136"} {:id "defn-/lower-construct", :kind "defn-", :line 50, :end-line 55, :hash "642988114"} {:id "defn-/lower-static-call", :kind "defn-", :line 57, :end-line 65, :hash "1723636077"} {:id "defn-/lower-closure-call", :kind "defn-", :line 67, :end-line 76, :hash "181411985"} {:id "defn-/lower-call", :kind "defn-", :line 78, :end-line 107, :hash "-345196595"} {:id "defn-/lower-variant", :kind "defn-", :line 109, :end-line 115, :hash "7509686"} {:id "defn-/lower-record-get", :kind "defn-", :line 117, :end-line 124, :hash "-725985551"} {:id "defn-/lower-if", :kind "defn-", :line 126, :end-line 132, :hash "-2017247463"} {:id "defn-/lower-seq", :kind "defn-", :line 134, :end-line 149, :hash "1082177207"} {:id "defn-/lower-let", :kind "defn-", :line 151, :end-line 176, :hash "-64431889"} {:id "defn-/lower-java-static-call", :kind "defn-", :line 178, :end-line 186, :hash "1165835420"} {:id "defn-/lower-java-call", :kind "defn-", :line 188, :end-line 196, :hash "203107229"} {:id "defn-/lower-java-get-field", :kind "defn-", :line 198, :end-line 204, :hash "2032560028"} {:id "defn-/lower-java-static-get-field", :kind "defn-", :line 206, :end-line 212, :hash "-1037422566"} {:id "defn-/lower-java-set-field", :kind "defn-", :line 214, :end-line 221, :hash "-203168201"} {:id "defn-/lower-java-static-set-field", :kind "defn-", :line 223, :end-line 230, :hash "824180224"} {:id "defn-/lower-java-new", :kind "defn-", :line 232, :end-line 238, :hash "2127526023"} {:id "defn-/lower-primitive-binary", :kind "defn-", :line 240, :end-line 244, :hash "-1091154086"} {:id "defn-/lower-primitive-unary", :kind "defn-", :line 246, :end-line 250, :hash "-597151269"} {:id "defn-/lower-lambda", :kind "defn-", :line 252, :end-line 260, :hash "1375267938"} {:id "defn-/lower-var", :kind "defn-", :line 262, :end-line 269, :hash "550518548"} {:id "defn-/lower-set", :kind "defn-", :line 271, :end-line 280, :hash "-1854533276"} {:id "defn-/lower-loop", :kind "defn-", :line 282, :end-line 304, :hash "-2120471898"} {:id "defn-/lower-recur", :kind "defn-", :line 306, :end-line 310, :hash "628432698"} {:id "defn-/lower-catch-type", :kind "defn-", :line 312, :end-line 317, :hash "828723469"} {:id "defn-/lower-try", :kind "defn-", :line 319, :end-line 333, :hash "2141795572"} {:id "defn-/lower-raise", :kind "defn-", :line 335, :end-line 343, :hash "517260333"} {:id "def/lower-expr-handlers", :kind "def", :line 345, :end-line 420, :hash "1044706378"} {:id "defn/lower-expr", :kind "defn", :line 422, :end-line 428, :hash "-1590709867"} {:id "defn/lower-param", :kind "defn", :line 430, :end-line 433, :hash "-480161331"}]}
+;; {:version 1, :tested-at "2026-03-13T21:04:15.537338-05:00", :module-hash "290850496", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 5, :hash "-816319332"} {:id "form/1/declare", :kind "declare", :line 7, :end-line 7, :hash "-1588192225"} {:id "form/2/declare", :kind "declare", :line 8, :end-line 8, :hash "-350471521"} {:id "defn-/lower-floating-literal", :kind "defn-", :line 10, :end-line 19, :hash "193702899"} {:id "defn/lower-literal", :kind "defn", :line 21, :end-line 35, :hash "1784475901"} {:id "defn-/local-callee-name", :kind "defn-", :line 37, :end-line 40, :hash "291537367"} {:id "defn-/lower-local", :kind "defn-", :line 42, :end-line 58, :hash "-672533136"} {:id "defn-/lower-construct", :kind "defn-", :line 60, :end-line 65, :hash "642988114"} {:id "defn-/lower-static-call", :kind "defn-", :line 67, :end-line 75, :hash "1723636077"} {:id "defn-/lower-closure-call", :kind "defn-", :line 77, :end-line 86, :hash "181411985"} {:id "defn-/lower-call", :kind "defn-", :line 88, :end-line 117, :hash "-345196595"} {:id "defn-/lower-variant", :kind "defn-", :line 119, :end-line 125, :hash "7509686"} {:id "defn-/lower-record-get", :kind "defn-", :line 127, :end-line 134, :hash "-725985551"} {:id "defn-/lower-if", :kind "defn-", :line 136, :end-line 142, :hash "-2017247463"} {:id "defn-/lower-seq", :kind "defn-", :line 144, :end-line 159, :hash "1082177207"} {:id "defn-/lower-let", :kind "defn-", :line 161, :end-line 186, :hash "-64431889"} {:id "defn-/lower-java-static-call", :kind "defn-", :line 188, :end-line 196, :hash "1165835420"} {:id "defn-/lower-java-call", :kind "defn-", :line 198, :end-line 206, :hash "203107229"} {:id "defn-/lower-java-get-field", :kind "defn-", :line 208, :end-line 214, :hash "2032560028"} {:id "defn-/lower-java-static-get-field", :kind "defn-", :line 216, :end-line 222, :hash "-1037422566"} {:id "defn-/lower-java-set-field", :kind "defn-", :line 224, :end-line 231, :hash "-203168201"} {:id "defn-/lower-java-static-set-field", :kind "defn-", :line 233, :end-line 240, :hash "824180224"} {:id "defn-/lower-java-new", :kind "defn-", :line 242, :end-line 248, :hash "2127526023"} {:id "defn-/lower-primitive-binary", :kind "defn-", :line 250, :end-line 254, :hash "-1091154086"} {:id "defn-/lower-primitive-unary", :kind "defn-", :line 256, :end-line 260, :hash "-597151269"} {:id "defn-/lower-lambda", :kind "defn-", :line 262, :end-line 270, :hash "1375267938"} {:id "defn-/lower-var", :kind "defn-", :line 272, :end-line 279, :hash "550518548"} {:id "defn-/lower-set", :kind "defn-", :line 281, :end-line 290, :hash "-1854533276"} {:id "defn-/lower-loop", :kind "defn-", :line 292, :end-line 314, :hash "-2120471898"} {:id "defn-/lower-recur", :kind "defn-", :line 316, :end-line 320, :hash "628432698"} {:id "defn-/lower-catch-type", :kind "defn-", :line 322, :end-line 327, :hash "828723469"} {:id "defn-/lower-try", :kind "defn-", :line 329, :end-line 343, :hash "2141795572"} {:id "defn-/lower-raise", :kind "defn-", :line 345, :end-line 353, :hash "517260333"} {:id "def/lower-expr-handlers", :kind "def", :line 355, :end-line 452, :hash "-1491599528"} {:id "defn/lower-expr", :kind "defn", :line 454, :end-line 460, :hash "-1590709867"} {:id "defn/lower-param", :kind "defn", :line 462, :end-line 465, :hash "-480161331"}]}
 ;; clj-mutate-manifest-end

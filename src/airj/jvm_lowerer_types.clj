@@ -8,6 +8,8 @@
 
 (def ^:private primitive-types
   {'Int :int
+   'Float :float
+   'Double :double
    'Bool :boolean
    'Unit :void})
 
@@ -185,12 +187,16 @@
 
 (defn- infer-literal-type
   [expr]
-  (cond
-    (integer? expr) 'Int
-    (string? expr) 'String
-    (true? expr) 'Bool
-    (false? expr) 'Bool
-    :else nil))
+  (or (when (integer? expr)
+        'Int)
+      (when (instance? Float expr)
+        'Float)
+      (when (instance? Double expr)
+        'Double)
+      (when (string? expr)
+        'String)
+      (when (or (true? expr) (false? expr))
+        'Bool)))
 
 (defn- infer-record-get-type
   [expr ctx]
@@ -343,6 +349,24 @@
    :int-le (fn [_ _] 'Bool)
    :int-gt (fn [_ _] 'Bool)
    :int-ge (fn [_ _] 'Bool)
+   :float-add (fn [_ _] 'Float)
+   :float-sub (fn [_ _] 'Float)
+   :float-mul (fn [_ _] 'Float)
+   :float-div (fn [_ _] 'Float)
+   :float-eq (fn [_ _] 'Bool)
+   :float-lt (fn [_ _] 'Bool)
+   :float-le (fn [_ _] 'Bool)
+   :float-gt (fn [_ _] 'Bool)
+   :float-ge (fn [_ _] 'Bool)
+   :double-add (fn [_ _] 'Double)
+   :double-sub (fn [_ _] 'Double)
+   :double-mul (fn [_ _] 'Double)
+   :double-div (fn [_ _] 'Double)
+   :double-eq (fn [_ _] 'Bool)
+   :double-lt (fn [_ _] 'Bool)
+   :double-le (fn [_ _] 'Bool)
+   :double-gt (fn [_ _] 'Bool)
+   :double-ge (fn [_ _] 'Bool)
    :bool-eq (fn [_ _] 'Bool)
    :int-ne (fn [_ _] 'Bool)
    :string-eq (fn [_ _] 'Bool)
@@ -351,6 +375,10 @@
    :string-char-at (fn [_ _] 'String)
    :string-substring (fn [_ _] 'String)
    :int->string (fn [_ _] 'String)
+   :int->float (fn [_ _] 'Float)
+   :int->double (fn [_ _] 'Double)
+   :float->double (fn [_ _] 'Double)
+   :double->float (fn [_ _] 'Float)
    :string->int (fn [_ _] 'Int)
    :string-length (fn [_ _] 'Int)
    :string-trim (fn [_ _] 'String)
@@ -393,5 +421,5 @@
                {:expr expr}))))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-13T14:48:17.486401-05:00", :module-hash "-1015241192", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "360843331"} {:id "def/recur-type", :kind "def", :line 5, :end-line 5, :hash "-2071027665"} {:id "def/raise-type", :kind "def", :line 6, :end-line 6, :hash "692699866"} {:id "def/bottom-types", :kind "def", :line 7, :end-line 7, :hash "1188722171"} {:id "def/primitive-types", :kind "def", :line 9, :end-line 12, :hash "-746134113"} {:id "defn/fail!", :kind "defn", :line 14, :end-line 16, :hash "2111196879"} {:id "defn/internal-name", :kind "defn", :line 18, :end-line 20, :hash "-1330388378"} {:id "defn/nested-class-name", :kind "defn", :line 22, :end-line 24, :hash "-69163617"} {:id "defn/union-variant-class-name", :kind "defn", :line 26, :end-line 28, :hash "1810905660"} {:id "defn/java-type?", :kind "defn", :line 30, :end-line 33, :hash "1469399228"} {:id "defn/java-internal-name", :kind "defn", :line 35, :end-line 37, :hash "-653806206"} {:id "defn-/declared-type-op?", :kind "defn-", :line 39, :end-line 41, :hash "1769082278"} {:id "defn-/declared-class-name", :kind "defn-", :line 43, :end-line 46, :hash "864307960"} {:id "defn-/local-declared-type-name", :kind "defn-", :line 48, :end-line 51, :hash "448982123"} {:id "defn-/imported-declared-type-name", :kind "defn-", :line 53, :end-line 58, :hash "-1013484411"} {:id "defn/declared-type-name", :kind "defn", :line 60, :end-line 63, :hash "-1082717974"} {:id "form/16/declare", :kind "declare", :line 65, :end-line 65, :hash "921248303"} {:id "form/17/declare", :kind "declare", :line 66, :end-line 66, :hash "346281442"} {:id "form/18/declare", :kind "declare", :line 67, :end-line 67, :hash "885577939"} {:id "form/19/declare", :kind "declare", :line 68, :end-line 68, :hash "-749778473"} {:id "form/20/declare", :kind "declare", :line 69, :end-line 69, :hash "-1494776713"} {:id "defn/lower-type", :kind "defn", :line 71, :end-line 87, :hash "-1615388979"} {:id "defn/lower-expr-type", :kind "defn", :line 89, :end-line 93, :hash "1513759038"} {:id "defn/decl-map", :kind "defn", :line 95, :end-line 97, :hash "987686002"} {:id "defn/bind-local", :kind "defn", :line 99, :end-line 101, :hash "1561458697"} {:id "defn/bind-mutable-local", :kind "defn", :line 103, :end-line 107, :hash "-741002783"} {:id "defn/bind-lambda", :kind "defn", :line 109, :end-line 111, :hash "1527841059"} {:id "defn/with-loop-types", :kind "defn", :line 113, :end-line 115, :hash "-2037637816"} {:id "defn/local-type", :kind "defn", :line 117, :end-line 126, :hash "894152482"} {:id "defn/mutable-local-type", :kind "defn", :line 128, :end-line 130, :hash "791465470"} {:id "defn/field-type", :kind "defn", :line 132, :end-line 140, :hash "1633531799"} {:id "defn/record-class-name", :kind "defn", :line 142, :end-line 144, :hash "1389626956"} {:id "defn/fn-decl", :kind "defn", :line 146, :end-line 153, :hash "-774885008"} {:id "defn/local-lambda", :kind "defn", :line 155, :end-line 157, :hash "-436400273"} {:id "defn/local-fn-type", :kind "defn", :line 159, :end-line 163, :hash "1216422506"} {:id "defn/union-variant", :kind "defn", :line 165, :end-line 173, :hash "-1286541301"} {:id "defn/join-branch-types", :kind "defn", :line 175, :end-line 184, :hash "-2130619843"} {:id "defn-/infer-literal-type", :kind "defn-", :line 186, :end-line 193, :hash "-495777708"} {:id "defn-/infer-record-get-type", :kind "defn-", :line 195, :end-line 199, :hash "-612672585"} {:id "defn-/local-lambda-return-type", :kind "defn-", :line 201, :end-line 204, :hash "-377855316"} {:id "defn-/named-call-return-type", :kind "defn-", :line 206, :end-line 209, :hash "737420465"} {:id "defn-/infer-call-type", :kind "defn-", :line 211, :end-line 222, :hash "910305658"} {:id "defn-/infer-if-type", :kind "defn-", :line 224, :end-line 231, :hash "-2112938377"} {:id "defn-/infer-seq-type", :kind "defn-", :line 233, :end-line 245, :hash "604684926"} {:id "defn-/infer-let-type", :kind "defn-", :line 247, :end-line 260, :hash "327096300"} {:id "defn-/infer-lambda", :kind "defn-", :line 262, :end-line 267, :hash "-1117964483"} {:id "defn-/infer-loop", :kind "defn-", :line 269, :end-line 281, :hash "-46270947"} {:id "defn-/infer-recur", :kind "defn-", :line 283, :end-line 300, :hash "-1368982370"} {:id "defn-/infer-try", :kind "defn-", :line 302, :end-line 316, :hash "641639781"} {:id "defn-/infer-raise", :kind "defn-", :line 318, :end-line 321, :hash "465355386"} {:id "def/infer-type-handlers", :kind "def", :line 323, :end-line 385, :hash "1079785149"} {:id "defn/infer-type", :kind "defn", :line 387, :end-line 393, :hash "600232947"}]}
+;; {:version 1, :tested-at "2026-03-13T21:03:40.731978-05:00", :module-hash "-251534614", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "360843331"} {:id "def/recur-type", :kind "def", :line 5, :end-line 5, :hash "-2071027665"} {:id "def/raise-type", :kind "def", :line 6, :end-line 6, :hash "692699866"} {:id "def/bottom-types", :kind "def", :line 7, :end-line 7, :hash "1188722171"} {:id "def/primitive-types", :kind "def", :line 9, :end-line 14, :hash "-53859917"} {:id "defn/fail!", :kind "defn", :line 16, :end-line 18, :hash "2111196879"} {:id "defn/internal-name", :kind "defn", :line 20, :end-line 22, :hash "-1330388378"} {:id "defn/nested-class-name", :kind "defn", :line 24, :end-line 26, :hash "-69163617"} {:id "defn/union-variant-class-name", :kind "defn", :line 28, :end-line 30, :hash "1810905660"} {:id "defn/java-type?", :kind "defn", :line 32, :end-line 35, :hash "1469399228"} {:id "defn/java-internal-name", :kind "defn", :line 37, :end-line 39, :hash "-653806206"} {:id "defn-/declared-type-op?", :kind "defn-", :line 41, :end-line 43, :hash "1769082278"} {:id "defn-/declared-class-name", :kind "defn-", :line 45, :end-line 48, :hash "864307960"} {:id "defn-/local-declared-type-name", :kind "defn-", :line 50, :end-line 53, :hash "448982123"} {:id "defn-/imported-declared-type-name", :kind "defn-", :line 55, :end-line 60, :hash "-1013484411"} {:id "defn/declared-type-name", :kind "defn", :line 62, :end-line 65, :hash "-1082717974"} {:id "form/16/declare", :kind "declare", :line 67, :end-line 67, :hash "921248303"} {:id "form/17/declare", :kind "declare", :line 68, :end-line 68, :hash "346281442"} {:id "form/18/declare", :kind "declare", :line 69, :end-line 69, :hash "885577939"} {:id "form/19/declare", :kind "declare", :line 70, :end-line 70, :hash "-749778473"} {:id "form/20/declare", :kind "declare", :line 71, :end-line 71, :hash "-1494776713"} {:id "defn/lower-type", :kind "defn", :line 73, :end-line 89, :hash "-1615388979"} {:id "defn/lower-expr-type", :kind "defn", :line 91, :end-line 95, :hash "1513759038"} {:id "defn/decl-map", :kind "defn", :line 97, :end-line 99, :hash "987686002"} {:id "defn/bind-local", :kind "defn", :line 101, :end-line 103, :hash "1561458697"} {:id "defn/bind-mutable-local", :kind "defn", :line 105, :end-line 109, :hash "-741002783"} {:id "defn/bind-lambda", :kind "defn", :line 111, :end-line 113, :hash "1527841059"} {:id "defn/with-loop-types", :kind "defn", :line 115, :end-line 117, :hash "-2037637816"} {:id "defn/local-type", :kind "defn", :line 119, :end-line 128, :hash "894152482"} {:id "defn/mutable-local-type", :kind "defn", :line 130, :end-line 132, :hash "791465470"} {:id "defn/field-type", :kind "defn", :line 134, :end-line 142, :hash "1633531799"} {:id "defn/record-class-name", :kind "defn", :line 144, :end-line 146, :hash "1389626956"} {:id "defn/fn-decl", :kind "defn", :line 148, :end-line 155, :hash "-774885008"} {:id "defn/local-lambda", :kind "defn", :line 157, :end-line 159, :hash "-436400273"} {:id "defn/local-fn-type", :kind "defn", :line 161, :end-line 165, :hash "1216422506"} {:id "defn/union-variant", :kind "defn", :line 167, :end-line 175, :hash "-1286541301"} {:id "defn/join-branch-types", :kind "defn", :line 177, :end-line 186, :hash "-2130619843"} {:id "defn-/infer-literal-type", :kind "defn-", :line 188, :end-line 199, :hash "-2072052525"} {:id "defn-/infer-record-get-type", :kind "defn-", :line 201, :end-line 205, :hash "-612672585"} {:id "defn-/local-lambda-return-type", :kind "defn-", :line 207, :end-line 210, :hash "-377855316"} {:id "defn-/named-call-return-type", :kind "defn-", :line 212, :end-line 215, :hash "737420465"} {:id "defn-/infer-call-type", :kind "defn-", :line 217, :end-line 228, :hash "910305658"} {:id "defn-/infer-if-type", :kind "defn-", :line 230, :end-line 237, :hash "-2112938377"} {:id "defn-/infer-seq-type", :kind "defn-", :line 239, :end-line 251, :hash "604684926"} {:id "defn-/infer-let-type", :kind "defn-", :line 253, :end-line 266, :hash "327096300"} {:id "defn-/infer-lambda", :kind "defn-", :line 268, :end-line 273, :hash "-1117964483"} {:id "defn-/infer-loop", :kind "defn-", :line 275, :end-line 287, :hash "-46270947"} {:id "defn-/infer-recur", :kind "defn-", :line 289, :end-line 306, :hash "-1368982370"} {:id "defn-/infer-try", :kind "defn-", :line 308, :end-line 322, :hash "641639781"} {:id "defn-/infer-raise", :kind "defn-", :line 324, :end-line 327, :hash "465355386"} {:id "def/infer-type-handlers", :kind "def", :line 329, :end-line 413, :hash "2128942467"} {:id "defn/infer-type", :kind "defn", :line 415, :end-line 421, :hash "600232947"}]}
 ;; clj-mutate-manifest-end

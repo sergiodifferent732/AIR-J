@@ -465,6 +465,34 @@
                                        10]}]}]}
                (-> ast :decls first :body))))
 
+  (it "parses decimal literals floating operators and numeric conversions"
+    (let [source "(module example/floats
+                    (imports)
+                    (export orbit)
+                    (fn orbit
+                      (params (radius Double) (phase Float))
+                      (returns Float)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (double->float
+                        (double-add
+                          1.5
+                          (float->double
+                            (float-div
+                              (local phase)
+                              (int->float 2)))))))"
+          ast (sut/parse-module source)]
+      (should= {:op :double->float
+                :arg {:op :double-add
+                      :args [1.5
+                             {:op :float->double
+                              :arg {:op :float-div
+                                    :args [{:op :local :name 'phase}
+                                           {:op :int->float
+                                            :arg 2}]}}]}}
+               (-> ast :decls first :body))))
+
   (it "parses string equality int inequality conversion and stdout output"
     (let [source "(module example/io-ops
                     (imports)

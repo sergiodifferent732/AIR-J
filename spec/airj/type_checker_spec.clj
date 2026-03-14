@@ -415,6 +415,56 @@
                                                       1]}}}}]}]
       (should= module (sut/check-module module))))
 
+  (it "accepts floating-point literals operators conversions and interop signatures"
+    (let [module {:name 'example/floating
+                  :imports [{:op :java-import
+                             :class-name 'java.lang.Math}]
+                  :exports ['orbit-step]
+                  :decls [{:op :fn
+                           :name 'orbit-step
+                           :params [{:name 'phase :type 'Double}
+                                    {:name 'scale :type 'Float}]
+                           :return-type 'Float
+                           :effects ['Foreign.Throw]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :double->float
+                                  :arg {:op :double-add
+                                        :args [{:op :java-static-call
+                                                :class-name 'java.lang.Math
+                                                :member-id 'cos
+                                                :signature {:params ['Double]
+                                                            :return-type 'Double}
+                                                :args [{:op :local :name 'phase}]}
+                                               {:op :float->double
+                                                :arg {:op :float-div
+                                                      :args [{:op :local :name 'scale}
+                                                             {:op :int->float
+                                                              :arg 2}]}}]}}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "accepts direct Float and Double literals"
+    (let [module {:name 'example/literals
+                  :imports []
+                  :exports ['sample-float 'sample-double]
+                  :decls [{:op :fn
+                           :name 'sample-float
+                           :params []
+                           :return-type 'Float
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body (float 1.25)}
+                          {:op :fn
+                           :name 'sample-double
+                           :params []
+                           :return-type 'Double
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body 1.25}]}]
+      (should= module (sut/check-module module))))
+
   (it "accepts direct sequence length checks over StringSeq"
     (let [module {:name 'example/text-seq-length
                   :imports []

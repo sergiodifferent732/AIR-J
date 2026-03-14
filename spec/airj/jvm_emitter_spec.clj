@@ -63,6 +63,37 @@
           method (.getMethod klass "identity_int" (into-array Class [Integer/TYPE]))]
       (should= 7 (.invoke method nil (object-array [(int 7)])))))
 
+  (it "emits module methods that return Float and Double literals"
+    (let [plan {:op :jvm-module
+                :module-name 'example/literals
+                :internal-name "example/literals"
+                :exports ['sample-float 'sample-double]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'sample-float
+                           :owner "example/literals"
+                           :params []
+                           :return-type :float
+                           :effects []
+                           :body {:op :jvm-float
+                                  :value (float 1.25)
+                                  :jvm-type :float}}
+                          {:name 'sample-double
+                           :owner "example/literals"
+                           :params []
+                           :return-type :double
+                           :effects []
+                           :body {:op :jvm-double
+                                  :value 1.25
+                                  :jvm-type :double}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.literals" bytes)
+          float-method (.getMethod klass "sample_float" (into-array Class []))
+          double-method (.getMethod klass "sample_double" (into-array Class []))]
+      (should (< (Math/abs (- (float (.invoke float-method nil (object-array []))) (float 1.25))) 1.0e-5))
+      (should (< (Math/abs (- (double (.invoke double-method nil (object-array []))) 1.25)) 1.0e-9))))
+
   (it "rejects emission for an unknown local slot"
     (let [plan {:op :jvm-module
                 :module-name 'example/bad_local
@@ -143,6 +174,110 @@
           klass (define-class "example.java" bytes)
           method (.getMethod klass "abs" (into-array Class [Integer/TYPE]))]
       (should= 4 (.invoke method nil (object-array [(int -4)])))))
+
+  (it "emits floating-point primitives and conversions"
+    (let [plan {:op :jvm-module
+                :module-name 'example/floating
+                :internal-name "example/floating"
+                :exports ['orbit_step]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'orbit-step
+                           :owner "example/floating"
+                           :params [{:name 'phase :jvm-type :double}
+                                    {:name 'scale :jvm-type :float}]
+                           :return-type :float
+                           :effects ['Foreign.Throw]
+                           :body {:op :jvm-double->float
+                                  :arg {:op :jvm-double-add
+                                        :args [{:op :jvm-java-static-call
+                                                :class-name "java/lang/Math"
+                                                :member-id 'cos
+                                                :parameter-types [:double]
+                                                :return-type :double
+                                                :args [{:op :jvm-local
+                                                        :name 'phase
+                                                        :jvm-type :double}]
+                                                :jvm-type :double}
+                                               {:op :jvm-float->double
+                                                :arg {:op :jvm-float-div
+                                                      :args [{:op :jvm-local
+                                                              :name 'scale
+                                                              :jvm-type :float}
+                                                             {:op :jvm-int->float
+                                                              :arg {:op :jvm-int
+                                                                    :value 2
+                                                                    :jvm-type :int}
+                                                              :jvm-type :float}]
+                                                      :jvm-type :float}
+                                                :jvm-type :double}]
+                                        :jvm-type :double}
+                                  :jvm-type :float}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.floating" bytes)
+          method (.getMethod klass "orbit_step" (into-array Class [Double/TYPE Float/TYPE]))
+          result (.invoke method nil (object-array [(double 0.0) (float 4.0)]))]
+      (should (< (Math/abs (- (double result) 3.0)) 1.0e-5))))
+
+  (it "emits floating-point comparisons"
+    (let [plan {:op :jvm-module
+                :module-name 'example/floating_compare
+                :internal-name "example/floating_compare"
+                :exports ['less]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'less
+                           :owner "example/floating_compare"
+                           :params [{:name 'left :jvm-type :double}
+                                    {:name 'right :jvm-type :double}]
+                           :return-type :boolean
+                           :effects []
+                           :body {:op :jvm-double-lt
+                                  :args [{:op :jvm-local
+                                          :name 'left
+                                          :jvm-type :double}
+                                         {:op :jvm-local
+                                          :name 'right
+                                          :jvm-type :double}]
+                                  :jvm-type :boolean}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.floating_compare" bytes)
+          method (.getMethod klass "less" (into-array Class [Double/TYPE Double/TYPE]))]
+      (should= true (.invoke method nil (object-array [(double 1.5) (double 2.5)])))
+      (should= false (.invoke method nil (object-array [(double 3.5) (double 2.5)])))))
+
+  (it "discards double intermediates with POP2"
+    (let [plan {:op :jvm-module
+                :module-name 'example/discard_double
+                :internal-name "example/discard_double"
+                :exports ['program]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'program
+                           :owner "example/discard_double"
+                           :params []
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-seq
+                                  :exprs [{:op :jvm-double-add
+                                           :args [{:op :jvm-double
+                                                   :value 1.25
+                                                   :jvm-type :double}
+                                                  {:op :jvm-double
+                                                   :value 2.75
+                                                   :jvm-type :double}]
+                                           :jvm-type :double}
+                                          {:op :jvm-int
+                                           :value 7
+                                           :jvm-type :int}]
+                                  :jvm-type :int}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.discard_double" bytes)
+          method (.getMethod klass "program" (into-array Class []))]
+      (should= 7 (.invoke method nil (object-array [])))))
 
   (it "emits Java instance calls and field access"
     (let [plan {:op :jvm-module

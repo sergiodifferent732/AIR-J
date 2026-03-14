@@ -439,6 +439,62 @@
                    first
                    :body))))
 
+  (it "lowers floating-point literals operators and conversions into JVM plan nodes"
+    (let [module {:name 'example/floating
+                  :imports [{:op :java-import
+                             :class-name 'java.lang.Math}]
+                  :exports ['orbit-step]
+                  :decls [{:op :fn
+                           :name 'orbit-step
+                           :params [{:name 'phase :type 'Double}
+                                    {:name 'scale :type 'Float}]
+                           :return-type 'Float
+                           :effects ['Foreign.Throw]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :double->float
+                                  :arg {:op :double-add
+                                        :args [{:op :java-static-call
+                                                :class-name 'java.lang.Math
+                                                :member-id 'cos
+                                                :signature {:params ['Double]
+                                                            :return-type 'Double}
+                                                :args [{:op :local :name 'phase}]}
+                                               {:op :float->double
+                                                :arg {:op :float-div
+                                                      :args [{:op :local :name 'scale}
+                                                             {:op :int->float
+                                                              :arg 2}]}}]}}}]}]
+      (should= {:op :jvm-double->float
+                :arg {:op :jvm-double-add
+                      :args [{:op :jvm-java-static-call
+                              :class-name "java/lang/Math"
+                              :member-id 'cos
+                              :parameter-types [:double]
+                              :return-type :double
+                              :args [{:op :jvm-local
+                                      :name 'phase
+                                      :jvm-type :double}]
+                              :jvm-type :double}
+                             {:op :jvm-float->double
+                              :arg {:op :jvm-float-div
+                                    :args [{:op :jvm-local
+                                            :name 'scale
+                                            :jvm-type :float}
+                                           {:op :jvm-int->float
+                                            :arg {:op :jvm-int
+                                                  :value 2
+                                                  :jvm-type :int}
+                                            :jvm-type :float}]
+                                    :jvm-type :float}
+                              :jvm-type :double}]
+                      :jvm-type :double}
+                :jvm-type :float}
+               (-> (sut/lower-module module)
+                   :methods
+                   first
+                   :body))))
+
   (it "lowers conversion equality and stdout output into JVM plan nodes"
     (let [module {:name 'example/io_ops
                   :imports []

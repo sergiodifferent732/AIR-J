@@ -2,6 +2,8 @@
 
 (def ^:private primitive-types
   {'Bool Boolean/TYPE
+   'Float Float/TYPE
+   'Double Double/TYPE
    'Int Integer/TYPE
    'Unit Void/TYPE})
 
@@ -33,5 +35,5 @@
       :else (.isAssignableFrom expected actual))))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-13T13:47:44.682392-05:00", :module-hash "1723544774", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 1, :hash "-220394871"} {:id "def/primitive-types", :kind "def", :line 3, :end-line 6, :hash "-819992007"} {:id "defn/load-class", :kind "defn", :line 8, :end-line 10, :hash "1222057517"} {:id "defn/java-type-expr?", :kind "defn", :line 12, :end-line 15, :hash "-2087947263"} {:id "defn/resolve-type", :kind "defn", :line 17, :end-line 24, :hash "1752987975"} {:id "defn/assignable-type-expr?", :kind "defn", :line 26, :end-line 33, :hash "648140632"}]}
+;; {:version 1, :tested-at "2026-03-13T16:34:43.043104-05:00", :module-hash "-598516043", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 1, :hash "-220394871"} {:id "def/primitive-types", :kind "def", :line 3, :end-line 8, :hash "49647705"} {:id "defn/load-class", :kind "defn", :line 10, :end-line 12, :hash "1222057517"} {:id "defn/java-type-expr?", :kind "defn", :line 14, :end-line 17, :hash "-2087947263"} {:id "defn/resolve-type", :kind "defn", :line 19, :end-line 26, :hash "1752987975"} {:id "defn/assignable-type-expr?", :kind "defn", :line 28, :end-line 35, :hash "648140632"}]}
 ;; clj-mutate-manifest-end
