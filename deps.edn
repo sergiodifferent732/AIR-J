@@ -18,7 +18,7 @@
   {:main-opts ["-m" "clj-mutate.core"]
    :extra-deps {clj-mutate/clj-mutate
                 {:git/url "https://github.com/unclebob/clj-mutate.git"
-                 :git/sha "5f8262718d1a2791cc89424036d4fb4e7007ff91"}
+                 :git/sha "a95a3352cd5fe104dac8e7a5c0b97547ba5718d5"}
                 org.clojure/tools.reader {:mvn/version "1.4.2"}
                 speclj/speclj {:mvn/version "3.10.0"}}
    :extra-paths ["spec"]}

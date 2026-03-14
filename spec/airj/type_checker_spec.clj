@@ -510,6 +510,64 @@
                                                 0]}}}]}]
       (should= module (sut/check-module module))))
 
+  (it "accepts sequence rest concat and canonical map primitives"
+    (let [module {:name 'example/data-core
+                  :imports [{:op :airj-import
+                             :module 'airj/core
+                             :symbols ['Option]}]
+                  :interfaces {'airj/core {:name 'airj/core
+                                           :imports []
+                                           :exports ['Option]
+                                           :decls [{:op :union
+                                                    :name 'Option
+                                                    :type-params ['T]
+                                                    :variants [{:name 'None
+                                                                :fields []}
+                                                               {:name 'Some
+                                                                :fields [{:name 'value
+                                                                          :type 'T}]}]}]}}
+                  :exports ['summarize]
+                  :decls [{:op :fn
+                           :name 'summarize
+                           :params [{:name 'items :type '(Seq String)}]
+                           :return-type '(Option Int)
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :map-get
+                                  :args [{:op :map-set
+                                          :args [{:op :map-empty
+                                                  :value-type 'Int}
+                                                 "tail-size"
+                                                 {:op :seq-length
+                                                  :arg {:op :seq-concat
+                                                        :args [{:op :seq-rest
+                                                                :arg {:op :local :name 'items}}
+                                                               {:op :string-split-on
+                                                                :args ["z" ","]}]}}]}
+                                         "tail-size"]}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "rejects map-set with a non-string key"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Type mismatch."
+                  (sut/check-module
+                   {:name 'example/bad-map-key
+                    :imports []
+                    :exports ['build]
+                    :decls [{:op :fn
+                             :name 'build
+                             :params []
+                             :return-type '(Map String Int)
+                             :effects []
+                             :requires [true]
+                             :ensures [true]
+                             :body {:op :map-set
+                                    :args [{:op :map-empty
+                                            :value-type 'Int}
+                                           1
+                                           2]}}]})))
+
   (it "rejects string-char-at with a non-int index"
     (should-throw clojure.lang.ExceptionInfo
                   "Type mismatch."
@@ -1091,8 +1149,8 @@
                                               ctx))))
 
   (it "checks invariants on non-data declarations with the existing context"
-    (let [ctx {:env {'value 'Bool}
-               :mutable #{}
+    (let [ctx {:locals {'value 'Bool}
+               :mutable-locals {}
                :loop-types nil}
           check-invariants (ns-resolve 'airj.type-checker 'check-invariants)]
       (should-not-throw

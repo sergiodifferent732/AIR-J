@@ -921,9 +921,12 @@ Each diagnostic must include:
 Version 0 assumes, but does not fully specify, a minimal library surface providing:
 - boolean and numeric operators as ordinary functions
 - explicit numeric conversions
-- null-handling utilities for `Nullable`
-- `Result` constructors and destructors
-- basic collection operations if lists/maps are exposed
+- canonical `Option`, `Result`, and `Diagnostic` carriers in `airj/core`
+- wrapper functions that convert common recoverable failures into `Result`
+- a minimal filesystem boundary in `airj/file`
+- canonical sequence operations over `(Seq T)` when sequence values are exposed
+- canonical keyed structures over `(Map String T)` when named lookup is exposed
+- line-oriented filesystem helpers only when they still return canonical AIR-J data such as `(Seq String)` and `Result`
 
 These are library assumptions, not core syntax.
 

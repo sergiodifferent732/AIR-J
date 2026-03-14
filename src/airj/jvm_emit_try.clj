@@ -41,6 +41,13 @@
   (when result-slot
     (.visitVarInsn mv (load-opcode jvm-type) (:slot result-slot))))
 
+(defn- emit-result-cast
+  [^MethodVisitor mv result-slot jvm-type]
+  (when (and result-slot
+             (string? jvm-type)
+             (not= "java/lang/Object" jvm-type))
+    (.visitTypeInsn mv Opcodes/CHECKCAST jvm-type)))
+
 (defn- catch-env
   [base-env catch-clause throwable-slot]
   (let [slot-index (or (:slot throwable-slot)
@@ -63,6 +70,7 @@
   (when-let [finally-expr (:finally expr)]
     ((:emit-discarded tools) mv finally-expr (:base-env layout)))
   (emit-result-load mv (:result-slot layout) (:jvm-type expr) (:load-opcode tools))
+  (emit-result-cast mv (:result-slot layout) (:jvm-type expr))
   (.visitJumpInsn mv Opcodes/GOTO (:done-label layout)))
 
 (defn- emit-try-catch
@@ -81,6 +89,7 @@
     (when-let [finally-expr (:finally expr)]
       ((:emit-discarded tools) mv finally-expr env))
     (emit-result-load mv (:result-slot layout) (:jvm-type expr) (:load-opcode tools))
+    (emit-result-cast mv (:result-slot layout) (:jvm-type expr))
     (.visitJumpInsn mv Opcodes/GOTO (:done-label layout))))
 
 (defn- emit-try-finally-handler
@@ -107,5 +116,5 @@
     (.visitLabel mv (:done-label layout))))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-12T10:22:10.984689-05:00", :module-hash "-1033971699", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 2, :hash "1679852136"} {:id "defn-/try-layout", :kind "defn-", :line 4, :end-line 23, :hash "21833502"} {:id "defn-/emit-try-registrations", :kind "defn-", :line 25, :end-line 32, :hash "-1993258922"} {:id "defn-/emit-result-store", :kind "defn-", :line 34, :end-line 37, :hash "-1701649778"} {:id "defn-/emit-result-load", :kind "defn-", :line 39, :end-line 42, :hash "201184486"} {:id "defn-/catch-env", :kind "defn-", :line 44, :end-line 55, :hash "1751921815"} {:id "defn-/emit-try-success", :kind "defn-", :line 57, :end-line 66, :hash "1875174106"} {:id "defn-/emit-try-catch", :kind "defn-", :line 68, :end-line 84, :hash "-667113241"} {:id "defn-/emit-try-finally-handler", :kind "defn-", :line 86, :end-line 93, :hash "-1070537968"} {:id "defn/emit-try", :kind "defn", :line 95, :end-line 107, :hash "1018454071"}]}
+;; {:version 1, :tested-at "2026-03-14T08:39:37.528518-05:00", :module-hash "-1457174523", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 2, :hash "1679852136"} {:id "defn-/try-layout", :kind "defn-", :line 4, :end-line 23, :hash "21833502"} {:id "defn-/emit-try-registrations", :kind "defn-", :line 25, :end-line 32, :hash "-1993258922"} {:id "defn-/emit-result-store", :kind "defn-", :line 34, :end-line 37, :hash "-1701649778"} {:id "defn-/emit-result-load", :kind "defn-", :line 39, :end-line 42, :hash "201184486"} {:id "defn-/emit-result-cast", :kind "defn-", :line 44, :end-line 49, :hash "1323361381"} {:id "defn-/catch-env", :kind "defn-", :line 51, :end-line 62, :hash "1751921815"} {:id "defn-/emit-try-success", :kind "defn-", :line 64, :end-line 74, :hash "-1264253250"} {:id "defn-/emit-try-catch", :kind "defn-", :line 76, :end-line 93, :hash "279796829"} {:id "defn-/emit-try-finally-handler", :kind "defn-", :line 95, :end-line 102, :hash "-1070537968"} {:id "defn/emit-try", :kind "defn", :line 104, :end-line 116, :hash "1018454071"}]}
 ;; clj-mutate-manifest-end

@@ -389,7 +389,10 @@ Exceptional model:
 Rules:
 - recoverable domain failures should prefer `Result`
 - foreign exception behavior must not be hidden
-- functions that may raise must declare the relevant effects, such as `Foreign.Throw`
+- low-level fallible primitives may still expose `Foreign.Throw`
+- a `try` with catches handles `Foreign.Throw` at the AIR-J effect boundary
+- standard modules should wrap common recoverable failures into canonical `Result` values with `Diagnostic` payloads
+- functions that may still raise must declare the relevant effects, such as `Foreign.Throw`
 
 ## Metadata
 
@@ -565,6 +568,14 @@ Current primitive failure policy:
 - `io/read-line` should require `Stdin.Read` and `Foreign.Throw`
 - `io/print` and `io/println` should require `Stdout.Write`
 - pure string primitives such as concatenation and length should remain effect-free
+
+Current standard module policy:
+- `airj/core` should hold canonical data carriers such as `Option`, `Result`, and `Diagnostic`
+- `airj/core` may provide wrapper functions such as `parse-int` that convert common recoverable failures into `Result`
+- `airj/file` should expose the minimal canonical filesystem boundary first: existence, read, and write
+- standard library sequence-producing operations should converge on `(Seq T)` rather than proliferating ad hoc sequence types
+- canonical keyed structures should converge on `(Map String T)` rather than exposing Java collection choices by default
+- line-oriented filesystem helpers are acceptable when they return canonical AIR-J data such as `(Seq String)` and `Result`
 
 ## Recommended next step
 

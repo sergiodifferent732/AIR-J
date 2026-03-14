@@ -641,7 +641,7 @@
                                             {:op :jvm-string
                                              :value ","
                                              :jvm-type "java/lang/String"}]
-                                     :jvm-type "[Ljava/lang/String;"}
+                                     :jvm-type "java/util/List"}
                                     {:op :jvm-int
                                      :value 1
                                      :jvm-type :int}]
@@ -688,7 +688,7 @@
                                     {:op :jvm-string
                                      :value ","
                                      :jvm-type "java/lang/String"}]
-                             :jvm-type "[Ljava/lang/String;"}
+                             :jvm-type "java/util/List"}
                        :jvm-type :boolean}
                 :then {:op :jvm-string
                        :value ""
@@ -703,7 +703,7 @@
                                                     {:op :jvm-string
                                                      :value ","
                                                      :jvm-type "java/lang/String"}]
-                                             :jvm-type "[Ljava/lang/String;"}
+                                             :jvm-type "java/util/List"}
                                        :jvm-type "java/lang/String"}
                                       {:op :jvm-int
                                        :value 1
@@ -717,6 +717,82 @@
                                :jvm-type :int}]
                        :jvm-type "java/lang/String"}
                 :jvm-type "java/lang/String"}
+               (-> (sut/lower-module module)
+                   :methods
+                   first
+                   :body))))
+
+  (it "lowers sequence rest concat and canonical map primitives into JVM plan nodes"
+    (let [module {:name 'example/data_core
+                  :imports [{:op :airj-import
+                             :module 'airj/core
+                             :symbols ['Option]}]
+                  :interfaces {'airj/core {:name 'airj/core
+                                           :imports []
+                                           :exports ['Option]
+                                           :decls [{:op :union
+                                                    :name 'Option
+                                                    :type-params ['T]
+                                                    :variants [{:name 'None
+                                                                :fields []}
+                                                               {:name 'Some
+                                                                :fields [{:name 'value
+                                                                          :type 'T}]}]}]}}
+                  :exports ['lookup]
+                  :decls [{:op :fn
+                           :name 'lookup
+                           :params [{:name 'items :type '(Seq String)}]
+                           :return-type '(Option Int)
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :map-get
+                                  :args [{:op :map-set
+                                          :args [{:op :map-empty
+                                                  :value-type 'Int}
+                                                 "tail-size"
+                                                 {:op :seq-length
+                                                  :arg {:op :seq-concat
+                                                        :args [{:op :seq-rest
+                                                                :arg {:op :local :name 'items}}
+                                                               {:op :string-split-on
+                                                                :args ["z" ","]}]}}]}
+                                         "tail-size"]}}]}]
+      (should= {:op :jvm-map-get
+                :args [{:op :jvm-map-set
+                        :args [{:op :jvm-map-empty
+                                :value-jvm-type :int
+                                :jvm-type "java/util/Map"}
+                               {:op :jvm-string
+                                :value "tail-size"
+                                :jvm-type "java/lang/String"}
+                               {:op :jvm-seq-length
+                                :arg {:op :jvm-seq-concat
+                                      :args [{:op :jvm-seq-rest
+                                              :arg {:op :jvm-local
+                                                    :name 'items
+                                                    :jvm-type "java/util/List"}
+                                              :jvm-type "java/util/List"}
+                                             {:op :jvm-string-split-on
+                                              :args [{:op :jvm-string
+                                                      :value "z"
+                                                      :jvm-type "java/lang/String"}
+                                                     {:op :jvm-string
+                                                      :value ","
+                                                      :jvm-type "java/lang/String"}]
+                                              :jvm-type "java/util/List"}]
+                                      :jvm-type "java/util/List"}
+                                :jvm-type :int}]
+                        :value-jvm-type :int
+                        :jvm-type "java/util/Map"}
+                       {:op :jvm-string
+                        :value "tail-size"
+                        :jvm-type "java/lang/String"}]
+                :none-class-name "airj/core$Option$None"
+                :some-class-name "airj/core$Option$Some"
+                :some-parameter-types ["java/lang/Object"]
+                :value-jvm-type :int
+                :jvm-type "airj/core$Option"}
                (-> (sut/lower-module module)
                    :methods
                    first

@@ -838,6 +838,64 @@
       (should= 0 result)
       (should= "hello" (slurp file))))
 
+  (it "runs canonical AIR-J parse and file result wrappers"
+    (let [file (.toString (java.nio.file.Files/createTempFile "airj-file-result"
+                                                              ".txt"
+                                                              (make-array java.nio.file.attribute.FileAttribute 0)))
+          _ (clojure.java.io/delete-file file)
+          source "(module example/file_result
+                    (imports
+                      (airj airj/core Diagnostic Result parse-int)
+                      (airj airj/file exists? read-string-result write-string-result))
+                    (export main)
+                    (fn main
+                      (params (args StringSeq))
+                      (returns Int)
+                      (effects (File.Read File.Write Foreign.Throw))
+                      (requires true)
+                      (ensures true)
+                      (if
+                        (call (local exists?) (seq-get (local args) 0))
+                        1
+                        (seq
+                          (call (local write-string-result)
+                                (seq-get (local args) 0)
+                                \"41\")
+                          (call (local read-string-result)
+                                (seq-get (local args) 0))
+                          (call (local parse-int) \"41\")
+                          42))))"
+          result (sut/run-source! source [file])]
+      (should= 42 result)
+      (should= "41" (slurp file))))
+
+  (it "runs canonical sequence and map primitives through the compiler"
+    (let [source "(module example/structured_runtime
+                    (imports
+                      (airj airj/core Option))
+                    (export main)
+                    (fn main
+                      (params)
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (match
+                        (map-get
+                          (map-set
+                            (map-empty String)
+                            \"tail-mark\"
+                            (seq-first
+                              (seq-rest
+                                (string-split-on \"alpha\nbeta\ngamma\" \"\n\"))))
+                          \"tail-mark\")
+                        (case (Some value)
+                          (string-length (local value)))
+                        (case None
+                          0))))"
+          result (sut/run-source! source [])]
+      (should= 4 result)))
+
   (it "compiles direct local lambda calls into executable bytes"
     (let [source "(module example/lambdas
                     (imports)

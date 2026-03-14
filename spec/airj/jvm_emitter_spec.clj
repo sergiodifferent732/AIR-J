@@ -813,7 +813,7 @@
                                                               {:op :jvm-string
                                                                :value ","
                                                                :jvm-type "java/lang/String"}]
-                                                       :jvm-type "[Ljava/lang/String;"}
+                                                       :jvm-type "java/util/List"}
                                                       {:op :jvm-int
                                                        :value 1
                                                        :jvm-type :int}]
@@ -847,7 +847,7 @@
                                                {:op :jvm-string
                                                 :value ","
                                                 :jvm-type "java/lang/String"}]
-                                        :jvm-type "[Ljava/lang/String;"}
+                                        :jvm-type "java/util/List"}
                                   :jvm-type :int}}]}
           bytes (sut/emit-module-bytes plan)
           klass (define-class "example.seq_length" bytes)
@@ -877,7 +877,7 @@
                                                       {:op :jvm-string
                                                        :value ","
                                                        :jvm-type "java/lang/String"}]
-                                               :jvm-type "[Ljava/lang/String;"}
+                                               :jvm-type "java/util/List"}
                                          :jvm-type :boolean}
                                   :then {:op :jvm-string
                                          :value ""
@@ -892,7 +892,7 @@
                                                                       {:op :jvm-string
                                                                        :value ","
                                                                        :jvm-type "java/lang/String"}]
-                                                               :jvm-type "[Ljava/lang/String;"}
+                                                               :jvm-type "java/util/List"}
                                                          :jvm-type "java/lang/String"}
                                                         {:op :jvm-int
                                                          :value 1
@@ -911,6 +911,187 @@
           method (.getMethod klass "token" (into-array Class [String]))]
       (should= "b" (.invoke method nil (object-array ["abz,qq"])))
       (should= "" (.invoke method nil (object-array [","])))))
+
+  (it "emits typed sequence element casts for erased list values"
+    (let [plan {:op :jvm-module
+                :module-name 'example/typed_seq
+                :internal-name "example/typed_seq"
+                :exports ['first_int 'truthy 'first_double 'first_float]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'first_int
+                           :owner "example/typed_seq"
+                           :params [{:name 'items
+                                     :jvm-type "java/util/List"}]
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-seq-get
+                                  :args [{:op :jvm-local
+                                          :name 'items
+                                          :jvm-type "java/util/List"}
+                                         {:op :jvm-int
+                                          :value 0
+                                          :jvm-type :int}]
+                                  :jvm-type :int}}
+                          {:name 'truthy
+                           :owner "example/typed_seq"
+                           :params [{:name 'items
+                                     :jvm-type "java/util/List"}]
+                           :return-type :boolean
+                           :effects []
+                           :body {:op :jvm-seq-first
+                                  :arg {:op :jvm-local
+                                        :name 'items
+                                        :jvm-type "java/util/List"}
+                                  :jvm-type :boolean}}
+                          {:name 'first_double
+                           :owner "example/typed_seq"
+                           :params [{:name 'items
+                                     :jvm-type "java/util/List"}]
+                           :return-type :double
+                           :effects []
+                           :body {:op :jvm-seq-first
+                                  :arg {:op :jvm-local
+                                        :name 'items
+                                        :jvm-type "java/util/List"}
+                                  :jvm-type :double}}
+                          {:name 'first_float
+                           :owner "example/typed_seq"
+                           :params [{:name 'items
+                                     :jvm-type "java/util/List"}]
+                           :return-type :float
+                           :effects []
+                           :body {:op :jvm-seq-first
+                                  :arg {:op :jvm-local
+                                        :name 'items
+                                        :jvm-type "java/util/List"}
+                                  :jvm-type :float}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.typed_seq" bytes)
+          first-int (.getMethod klass "first_int" (into-array Class [java.util.List]))
+          truthy (.getMethod klass "truthy" (into-array Class [java.util.List]))
+          first-double (.getMethod klass "first_double" (into-array Class [java.util.List]))
+          first-float (.getMethod klass "first_float" (into-array Class [java.util.List]))]
+      (should= 7 (.invoke first-int nil (object-array [(java.util.Arrays/asList (into-array Object [(int 7)]))])))
+      (should= true (.invoke truthy nil (object-array [(java.util.Arrays/asList (into-array Object [true]))])))
+      (should= 2.5 (.invoke first-double nil (object-array [(java.util.Arrays/asList (into-array Object [(double 2.5)]))])))
+      (should= (float 3.5) (.invoke first-float nil (object-array [(java.util.Arrays/asList (into-array Object [(float 3.5)]))])))))
+
+  (it "emits legacy array-backed sequence operations for StringSeq entry arguments"
+    (let [plan {:op :jvm-module
+                :module-name 'example/array_seq
+                :internal-name "example/array_seq"
+                :exports ['token_size]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'token_size
+                           :owner "example/array_seq"
+                           :params [{:name 'args
+                                     :jvm-type "[Ljava/lang/String;"}]
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-if
+                                  :test {:op :jvm-seq-empty
+                                         :arg {:op :jvm-local
+                                               :name 'args
+                                               :jvm-type "[Ljava/lang/String;"}
+                                         :jvm-type :boolean}
+                                  :then {:op :jvm-int
+                                         :value 0
+                                         :jvm-type :int}
+                                  :else {:op :jvm-string-length
+                                         :arg {:op :jvm-seq-first
+                                               :arg {:op :jvm-local
+                                                     :name 'args
+                                                     :jvm-type "[Ljava/lang/String;"}
+                                               :jvm-type "java/lang/String"}
+                                         :jvm-type :int}
+                                  :jvm-type :int}}
+                          {:name 'pick
+                           :owner "example/array_seq"
+                           :params [{:name 'args
+                                     :jvm-type "[Ljava/lang/String;"}]
+                           :return-type "java/lang/String"
+                           :effects []
+                           :body {:op :jvm-seq-get
+                                  :args [{:op :jvm-local
+                                          :name 'args
+                                          :jvm-type "[Ljava/lang/String;"}
+                                         {:op :jvm-int
+                                          :value 1
+                                          :jvm-type :int}]
+                                  :jvm-type "java/lang/String"}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.array_seq" bytes)
+          token-size (.getMethod klass "token_size" (into-array Class [(class (into-array String []))]))
+          pick (.getMethod klass "pick" (into-array Class [(class (into-array String []))]))]
+      (should= 0 (.invoke token-size nil (object-array [(into-array String [])])))
+      (should= 3 (.invoke token-size nil (object-array [(into-array String ["abc" "de"])])))
+      (should= "de" (.invoke pick nil (object-array [(into-array String ["abc" "de"])])))))
+
+  (it "emits legacy array-backed sequence length rest and concat operations"
+    (let [plan {:op :jvm-module
+                :module-name 'example/array_seq_more
+                :internal-name "example/array_seq_more"
+                :exports ['arg_count 'tail_first 'combined_count]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'arg_count
+                           :owner "example/array_seq_more"
+                           :params [{:name 'args
+                                     :jvm-type "[Ljava/lang/String;"}]
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-seq-length
+                                  :arg {:op :jvm-local
+                                        :name 'args
+                                        :jvm-type "[Ljava/lang/String;"}
+                                  :jvm-type :int}}
+                          {:name 'tail_first
+                           :owner "example/array_seq_more"
+                           :params [{:name 'args
+                                     :jvm-type "[Ljava/lang/String;"}]
+                           :return-type "java/lang/String"
+                           :effects []
+                           :body {:op :jvm-seq-first
+                                  :arg {:op :jvm-seq-rest
+                                        :arg {:op :jvm-local
+                                              :name 'args
+                                              :jvm-type "[Ljava/lang/String;"}
+                                        :jvm-type "java/util/List"}
+                                  :jvm-type "java/lang/String"}}
+                          {:name 'combined_count
+                           :owner "example/array_seq_more"
+                           :params [{:name 'args
+                                     :jvm-type "[Ljava/lang/String;"}]
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-seq-length
+                                  :arg {:op :jvm-seq-concat
+                                        :args [{:op :jvm-local
+                                                :name 'args
+                                                :jvm-type "[Ljava/lang/String;"}
+                                               {:op :jvm-string-split-on
+                                                :args [{:op :jvm-string
+                                                        :value "tail,more"
+                                                        :jvm-type "java/lang/String"}
+                                                       {:op :jvm-string
+                                                        :value ","
+                                                        :jvm-type "java/lang/String"}]
+                                                :jvm-type "java/util/List"}]
+                                        :jvm-type "java/util/List"}
+                                  :jvm-type :int}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.array_seq_more" bytes)
+          arg-count (.getMethod klass "arg_count" (into-array Class [(class (into-array String []))]))
+          tail-first (.getMethod klass "tail_first" (into-array Class [(class (into-array String []))]))
+          combined-count (.getMethod klass "combined_count" (into-array Class [(class (into-array String []))]))]
+      (should= 2 (.invoke arg-count nil (object-array [(into-array String ["abc" "de"])])))
+      (should= "de" (.invoke tail-first nil (object-array [(into-array String ["abc" "de"])])))
+      (should= 4 (.invoke combined-count nil (object-array [(into-array String ["abc" "de"])])))))
 
   (it "emits static Java field access"
     (let [plan {:op :jvm-module
@@ -1055,6 +1236,260 @@
           klass (define-class "example.state" bytes)
           method (.getMethod klass "compute" (into-array Class [Integer/TYPE]))]
       (should= 9 (.invoke method nil (object-array [(int 5)])))))
+
+  (it "emits record field reads that unbox float values stored as Object"
+    (let [plan {:op :jvm-module
+                :module-name 'example/object_box
+                :internal-name "example/object_box"
+                :exports ['weight]
+                :records [{:name 'Box
+                           :class-name "example/object_box$Box"
+                           :fields [{:name 'value :jvm-type "java/lang/Object"}]}]
+                :enums []
+                :unions []
+                :methods [{:name 'weight
+                           :owner "example/object_box"
+                           :params []
+                           :return-type :float
+                           :effects []
+                           :body {:op :jvm-record-get
+                                  :target {:op :jvm-construct
+                                           :class-name "example/object_box$Box"
+                                           :parameter-types ["java/lang/Object"]
+                                           :args [{:op :jvm-float
+                                                   :value (float 2.5)
+                                                   :jvm-type :float}]
+                                           :jvm-type "example/object_box$Box"}
+                                  :field 'value
+                                  :field-jvm-type "java/lang/Object"
+                                  :jvm-type :float}}]}
+          classes (define-classes (sut/emit-class-bytes plan))
+          module-class (get classes "example/object_box")
+          method (.getMethod module-class "weight" (into-array Class []))]
+      (should= (float 2.5) (.invoke method nil (object-array [])))))
+
+  (it "emits mutable JVM locals without cell backing"
+    (let [plan {:op :jvm-module
+                :module-name 'example/plain_state
+                :internal-name "example/plain_state"
+                :exports ['run]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'run
+                           :owner "example/plain_state"
+                           :params []
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-seq
+                                  :exprs [{:op :jvm-var
+                                           :name 'total
+                                           :init {:op :jvm-int
+                                                  :value 1
+                                                  :jvm-type :int}
+                                           :jvm-type :void}
+                                          {:op :jvm-set
+                                           :name 'total
+                                           :expr {:op :jvm-int
+                                                  :value 4
+                                                  :jvm-type :int}
+                                           :jvm-type :void}
+                                          {:op :jvm-local
+                                           :name 'total
+                                           :jvm-type :int}]
+                                  :jvm-type :int}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.plain_state" bytes)
+          method (.getMethod klass "run" (into-array Class []))]
+      (should= 4 (.invoke method nil (object-array [])))))
+
+  (it "emits boxed primitive map operations and key enumeration"
+    (let [plan {:op :jvm-module
+                :module-name 'example/maps
+                :internal-name "example/maps"
+                :exports ['int_key? 'bool_key? 'float_key? 'double_key? 'key_count]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'int_key?
+                           :owner "example/maps"
+                           :params []
+                           :return-type :boolean
+                           :effects []
+                           :body {:op :jvm-map-contains
+                                  :args [{:op :jvm-map-set
+                                          :args [{:op :jvm-map-empty
+                                                  :jvm-type "java/util/Map"}
+                                                 {:op :jvm-string
+                                                  :value "i"
+                                                  :jvm-type "java/lang/String"}
+                                                 {:op :jvm-int
+                                                  :value 3
+                                                  :jvm-type :int}]
+                                          :jvm-type "java/util/Map"}
+                                         {:op :jvm-string
+                                          :value "i"
+                                          :jvm-type "java/lang/String"}]
+                                  :jvm-type :boolean}}
+                          {:name 'bool_key?
+                           :owner "example/maps"
+                           :params []
+                           :return-type :boolean
+                           :effects []
+                           :body {:op :jvm-map-contains
+                                  :args [{:op :jvm-map-set
+                                          :args [{:op :jvm-map-empty
+                                                  :jvm-type "java/util/Map"}
+                                                 {:op :jvm-string
+                                                  :value "b"
+                                                  :jvm-type "java/lang/String"}
+                                                 {:op :jvm-boolean
+                                                  :value true
+                                                  :jvm-type :boolean}]
+                                          :jvm-type "java/util/Map"}
+                                         {:op :jvm-string
+                                          :value "b"
+                                          :jvm-type "java/lang/String"}]
+                                  :jvm-type :boolean}}
+                          {:name 'float_key?
+                           :owner "example/maps"
+                           :params []
+                           :return-type :boolean
+                           :effects []
+                           :body {:op :jvm-map-contains
+                                  :args [{:op :jvm-map-set
+                                          :args [{:op :jvm-map-empty
+                                                  :jvm-type "java/util/Map"}
+                                                 {:op :jvm-string
+                                                  :value "f"
+                                                  :jvm-type "java/lang/String"}
+                                                 {:op :jvm-float
+                                                  :value (float 1.5)
+                                                  :jvm-type :float}]
+                                          :jvm-type "java/util/Map"}
+                                         {:op :jvm-string
+                                          :value "f"
+                                          :jvm-type "java/lang/String"}]
+                                  :jvm-type :boolean}}
+                          {:name 'double_key?
+                           :owner "example/maps"
+                           :params []
+                           :return-type :boolean
+                           :effects []
+                           :body {:op :jvm-map-contains
+                                  :args [{:op :jvm-map-set
+                                          :args [{:op :jvm-map-empty
+                                                  :jvm-type "java/util/Map"}
+                                                 {:op :jvm-string
+                                                  :value "d"
+                                                  :jvm-type "java/lang/String"}
+                                                 {:op :jvm-double
+                                                  :value 2.5
+                                                  :jvm-type :double}]
+                                          :jvm-type "java/util/Map"}
+                                         {:op :jvm-string
+                                          :value "d"
+                                          :jvm-type "java/lang/String"}]
+                                  :jvm-type :boolean}}
+                          {:name 'key_count
+                           :owner "example/maps"
+                           :params []
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-seq-length
+                                  :arg {:op :jvm-map-keys
+                                        :arg {:op :jvm-map-set
+                                              :args [{:op :jvm-map-empty
+                                                      :jvm-type "java/util/Map"}
+                                                     {:op :jvm-string
+                                                      :value "k"
+                                                      :jvm-type "java/lang/String"}
+                                                     {:op :jvm-string
+                                                      :value "v"
+                                                      :jvm-type "java/lang/String"}]
+                                              :jvm-type "java/util/Map"}
+                                        :jvm-type "java/util/List"}
+                                  :jvm-type :int}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.maps" bytes)
+          int-key? (.getMethod klass "int_key?" (into-array Class []))
+          bool-key? (.getMethod klass "bool_key?" (into-array Class []))
+          float-key? (.getMethod klass "float_key?" (into-array Class []))
+          double-key? (.getMethod klass "double_key?" (into-array Class []))
+          key-count (.getMethod klass "key_count" (into-array Class []))]
+      (should= true (.invoke int-key? nil (object-array [])))
+      (should= true (.invoke bool-key? nil (object-array [])))
+      (should= true (.invoke float-key? nil (object-array [])))
+      (should= true (.invoke double-key? nil (object-array [])))
+      (should= 1 (.invoke key-count nil (object-array [])))))
+
+  (it "emits literal tests"
+    (let [plan {:op :jvm-module
+                :module-name 'example/literal_test
+                :internal-name "example/literal_test"
+                :exports ['matches]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'matches
+                           :owner "example/literal_test"
+                           :params [{:name 'value :jvm-type :int}]
+                           :return-type :boolean
+                           :effects []
+                           :body {:op :jvm-literal-test
+                                  :target {:op :jvm-local
+                                           :name 'value
+                                           :jvm-type :int}
+                                  :literal {:op :jvm-int
+                                            :value 7
+                                            :jvm-type :int}
+                                  :jvm-type :boolean}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.literal_test" bytes)
+          method (.getMethod klass "matches" (into-array Class [Integer/TYPE]))]
+      (should= true (.invoke method nil (object-array [(int 7)])))
+      (should= false (.invoke method nil (object-array [(int 3)])))))
+
+  (it "rejects recur outside a loop"
+    (let [plan {:op :jvm-module
+                :module-name 'example/bad_recur
+                :internal-name "example/bad_recur"
+                :exports ['broken]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'broken
+                           :owner "example/bad_recur"
+                           :params []
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-recur
+                                  :args [{:op :jvm-int
+                                          :value 1
+                                          :jvm-type :int}]
+                                  :jvm-type :int}}]}]
+      (should-throw clojure.lang.ExceptionInfo
+                    "Recur emitted outside loop."
+                    (sut/emit-module-bytes plan))))
+
+  (it "rejects unsupported JVM emission expressions"
+    (let [plan {:op :jvm-module
+                :module-name 'example/bad_expr
+                :internal-name "example/bad_expr"
+                :exports ['broken]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'broken
+                           :owner "example/bad_expr"
+                           :params []
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-unknown
+                                  :jvm-type :int}}]}]
+      (should-throw clojure.lang.ExceptionInfo
+                    "Unsupported JVM emission expression."
+                    (sut/emit-module-bytes plan))))
 
   (it "emits loops and recur in module methods"
     (let [plan {:op :jvm-module

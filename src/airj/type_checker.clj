@@ -411,8 +411,151 @@
     (ensure-type= expected-type
                   (infer-expr-type arg ctx decls)
                   {:expr expr
-                   :arg arg}))
+                 :arg arg}))
   (result return-type ctx))
+
+(defn- seq-element-type
+  [type-expr]
+  (cond
+    (= 'StringSeq type-expr) 'String
+    (and (seq? type-expr)
+         (= 'Seq (first type-expr))
+         (= 2 (count type-expr))) (second type-expr)
+    :else nil))
+
+(defn- map-value-type
+  [type-expr]
+  (when (and (seq? type-expr)
+             (= 'Map (first type-expr))
+             (= 3 (count type-expr))
+             (= 'String (second type-expr)))
+    (nth type-expr 2)))
+
+(defn- ensure-seq-type
+  [type-expr data]
+  (or (seq-element-type type-expr)
+      (fail! "Expected sequence type."
+             (assoc data :actual type-expr))))
+
+(defn- ensure-map-type
+  [type-expr data]
+  (or (map-value-type type-expr)
+      (fail! "Expected canonical map type."
+             (assoc data :actual type-expr))))
+
+(defn- infer-seq-unary
+  [expr ctx decls return-type]
+  (ensure-seq-type (infer-expr-type (:arg expr) ctx decls)
+                   {:expr expr
+                    :arg (:arg expr)})
+  (result return-type ctx))
+
+(defn- infer-seq-element
+  [expr ctx decls]
+  (let [arg-type (infer-expr-type (:arg expr) ctx decls)]
+    (result (ensure-seq-type arg-type
+                             {:expr expr
+                              :arg (:arg expr)})
+            ctx)))
+
+(defn- infer-seq-rest
+  [expr ctx decls]
+  (let [arg-type (infer-expr-type (:arg expr) ctx decls)]
+    (result (list 'Seq
+                  (ensure-seq-type arg-type
+                                   {:expr expr
+                                    :arg (:arg expr)}))
+            ctx)))
+
+(defn- infer-seq-concat
+  [expr ctx decls]
+  (ensure-arity= 2
+                 (count (:args expr))
+                 {:expr expr})
+  (let [left-type (infer-expr-type (first (:args expr)) ctx decls)
+        right-type (infer-expr-type (second (:args expr)) ctx decls)
+        left-element (ensure-seq-type left-type
+                                      {:expr expr
+                                       :arg (first (:args expr))})
+        right-element (ensure-seq-type right-type
+                                       {:expr expr
+                                        :arg (second (:args expr))})]
+    (ensure-type= left-element right-element {:expr expr})
+    (result (list 'Seq left-element) ctx)))
+
+(defn- infer-seq-get
+  [expr ctx decls]
+  (ensure-arity= 2
+                 (count (:args expr))
+                 {:expr expr})
+  (let [seq-type (infer-expr-type (first (:args expr)) ctx decls)]
+    (ensure-type= 'Int
+                  (infer-expr-type (second (:args expr)) ctx decls)
+                  {:expr expr
+                   :arg (second (:args expr))})
+    (result (ensure-seq-type seq-type
+                             {:expr expr
+                              :arg (first (:args expr))})
+            ctx)))
+
+(defn- infer-map-empty
+  [expr ctx]
+  (result (list 'Map 'String (:value-type expr)) ctx))
+
+(defn- infer-map-set
+  [expr ctx decls]
+  (ensure-arity= 3
+                 (count (:args expr))
+                 {:expr expr})
+  (let [map-type (infer-expr-type (first (:args expr)) ctx decls)
+        value-type (ensure-map-type map-type
+                                    {:expr expr
+                                     :arg (first (:args expr))})]
+    (ensure-type= 'String
+                  (infer-expr-type (second (:args expr)) ctx decls)
+                  {:expr expr
+                   :arg (second (:args expr))})
+    (ensure-type= value-type
+                  (infer-expr-type (nth (:args expr) 2) ctx decls)
+                  {:expr expr
+                   :arg (nth (:args expr) 2)})
+    (result map-type ctx)))
+
+(defn- infer-map-get
+  [expr ctx decls]
+  (ensure-arity= 2
+                 (count (:args expr))
+                 {:expr expr})
+  (let [map-type (infer-expr-type (first (:args expr)) ctx decls)
+        value-type (ensure-map-type map-type
+                                    {:expr expr
+                                     :arg (first (:args expr))})]
+    (ensure-type= 'String
+                  (infer-expr-type (second (:args expr)) ctx decls)
+                  {:expr expr
+                   :arg (second (:args expr))})
+    (result (list 'Option value-type) ctx)))
+
+(defn- infer-map-contains
+  [expr ctx decls]
+  (ensure-arity= 2
+                 (count (:args expr))
+                 {:expr expr})
+  (ensure-map-type (infer-expr-type (first (:args expr)) ctx decls)
+                   {:expr expr
+                    :arg (first (:args expr))})
+  (ensure-type= 'String
+                (infer-expr-type (second (:args expr)) ctx decls)
+                {:expr expr
+                 :arg (second (:args expr))})
+  (result 'Bool ctx))
+
+(defn- infer-map-keys
+  [expr ctx decls]
+  (ensure-map-type (infer-expr-type (:arg expr) ctx decls)
+                   {:expr expr
+                    :arg (:arg expr)})
+  (result '(Seq String) ctx))
 
 (defn- infer-java-new
   [expr ctx decls]
@@ -530,7 +673,7 @@
    :int-ne (fn [expr ctx decls] (infer-primitive-binary expr ctx decls 'Int 'Bool))
    :string-eq (fn [expr ctx decls] (infer-primitive-binary expr ctx decls 'String 'Bool))
    :string-concat (fn [expr ctx decls] (infer-primitive-binary expr ctx decls 'String 'String))
-   :string-split-on (fn [expr ctx decls] (infer-primitive-binary expr ctx decls 'String 'StringSeq))
+   :string-split-on (fn [expr ctx decls] (infer-primitive-binary expr ctx decls 'String '(Seq String)))
    :string-char-at (fn [expr ctx decls]
                      (ensure-arity= 2
                                     (count (:args expr))
@@ -567,22 +710,17 @@
    :string-length (fn [expr ctx decls] (infer-primitive-unary expr ctx decls 'String 'Int))
    :string-trim (fn [expr ctx decls] (infer-primitive-unary expr ctx decls 'String 'String))
    :string-empty? (fn [expr ctx decls] (infer-primitive-unary expr ctx decls 'String 'Bool))
-   :seq-empty? (fn [expr ctx decls] (infer-primitive-unary expr ctx decls 'StringSeq 'Bool))
-   :seq-length (fn [expr ctx decls] (infer-primitive-unary expr ctx decls 'StringSeq 'Int))
-   :seq-first (fn [expr ctx decls] (infer-primitive-unary expr ctx decls 'StringSeq 'String))
-   :seq-get (fn [expr ctx decls]
-              (ensure-arity= 2
-                             (count (:args expr))
-                             {:expr expr})
-              (ensure-type= 'StringSeq
-                            (infer-expr-type (first (:args expr)) ctx decls)
-                            {:expr expr
-                             :arg (first (:args expr))})
-              (ensure-type= 'Int
-                            (infer-expr-type (second (:args expr)) ctx decls)
-                            {:expr expr
-                             :arg (second (:args expr))})
-              (result 'String ctx))
+   :seq-empty? (fn [expr ctx decls] (infer-seq-unary expr ctx decls 'Bool))
+   :seq-length (fn [expr ctx decls] (infer-seq-unary expr ctx decls 'Int))
+   :seq-first (fn [expr ctx decls] (infer-seq-element expr ctx decls))
+   :seq-rest (fn [expr ctx decls] (infer-seq-rest expr ctx decls))
+   :seq-concat (fn [expr ctx decls] (infer-seq-concat expr ctx decls))
+   :seq-get (fn [expr ctx decls] (infer-seq-get expr ctx decls))
+   :map-empty (fn [expr ctx _decls] (infer-map-empty expr ctx))
+   :map-set (fn [expr ctx decls] (infer-map-set expr ctx decls))
+   :map-get (fn [expr ctx decls] (infer-map-get expr ctx decls))
+   :map-contains? (fn [expr ctx decls] (infer-map-contains expr ctx decls))
+   :map-keys (fn [expr ctx decls] (infer-map-keys expr ctx decls))
    :io-read-line (fn [_expr ctx _decls] (result 'String ctx))
    :io-print (fn [expr ctx decls]
                (ensure-type= 'String
@@ -688,5 +826,5 @@
     module))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-14T06:59:43.53611-05:00", :module-hash "1645628973", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 4, :hash "1214713234"} {:id "form/1/declare", :kind "declare", :line 6, :end-line 6, :hash "-750848269"} {:id "form/2/declare", :kind "declare", :line 7, :end-line 7, :hash "83426057"} {:id "defn-/fail!", :kind "defn-", :line 9, :end-line 11, :hash "765867407"} {:id "defn-/decl-map", :kind "defn-", :line 13, :end-line 21, :hash "244840831"} {:id "defn-/fn-type", :kind "defn-", :line 23, :end-line 28, :hash "1095575499"} {:id "defn-/bottom-type", :kind "defn-", :line 30, :end-line 33, :hash "475588588"} {:id "defn-/bottom-type?", :kind "defn-", :line 35, :end-line 37, :hash "1715044112"} {:id "defn-/result", :kind "defn-", :line 39, :end-line 42, :hash "-1781274230"} {:id "defn-/local-type", :kind "defn-", :line 44, :end-line 46, :hash "-1632824710"} {:id "defn-/mutable-local?", :kind "defn-", :line 48, :end-line 50, :hash "1438220795"} {:id "defn-/bind-local", :kind "defn-", :line 52, :end-line 54, :hash "1658319653"} {:id "defn-/bind-mutable", :kind "defn-", :line 56, :end-line 60, :hash "-1396184064"} {:id "defn-/with-loop-types", :kind "defn-", :line 62, :end-line 64, :hash "208229580"} {:id "defn-/without-loop-types", :kind "defn-", :line 66, :end-line 68, :hash "932574932"} {:id "defn-/fn-decl-type", :kind "defn-", :line 70, :end-line 74, :hash "1335497367"} {:id "defn-/module-fn-env", :kind "defn-", :line 76, :end-line 87, :hash "1452456309"} {:id "defn-/make-ctx", :kind "defn-", :line 89, :end-line 96, :hash "-1280194419"} {:id "defn-/literal-type", :kind "defn-", :line 98, :end-line 109, :hash "-2129463170"} {:id "defn-/compatible-types?", :kind "defn-", :line 111, :end-line 115, :hash "1551296287"} {:id "defn-/ensure-type=", :kind "defn-", :line 117, :end-line 121, :hash "1746399400"} {:id "defn-/ensure-arity=", :kind "defn-", :line 123, :end-line 127, :hash "266695403"} {:id "defn-/join-types", :kind "defn-", :line 129, :end-line 135, :hash "-1353034608"} {:id "defn-/enum-pattern?", :kind "defn-", :line 137, :end-line 139, :hash "-31853100"} {:id "defn-/bind-literal-pattern", :kind "defn-", :line 141, :end-line 147, :hash "-2136209369"} {:id "defn-/bind-binder-pattern", :kind "defn-", :line 149, :end-line 153, :hash "1161467246"} {:id "defn-/bind-pattern", :kind "defn-", :line 155, :end-line 163, :hash "-1814155925"} {:id "defn-/infer-local", :kind "defn-", :line 165, :end-line 171, :hash "195910838"} {:id "defn-/infer-record-get", :kind "defn-", :line 173, :end-line 186, :hash "-361239966"} {:id "defn-/imported-runtime-available?", :kind "defn-", :line 188, :end-line 193, :hash "-1783818705"} {:id "defn-/ensure-constructible-type!", :kind "defn-", :line 195, :end-line 199, :hash "908869040"} {:id "defn-/infer-construct", :kind "defn-", :line 201, :end-line 216, :hash "-1360397945"} {:id "defn-/infer-variant", :kind "defn-", :line 218, :end-line 243, :hash "-1236364359"} {:id "defn-/infer-if", :kind "defn-", :line 245, :end-line 253, :hash "-2003732048"} {:id "defn-/infer-match", :kind "defn-", :line 255, :end-line 269, :hash "262906490"} {:id "defn-/infer-call", :kind "defn-", :line 271, :end-line 285, :hash "-1175533470"} {:id "defn-/infer-lambda", :kind "defn-", :line 287, :end-line 300, :hash "-582701779"} {:id "defn-/infer-binding", :kind "defn-", :line 302, :end-line 306, :hash "737212167"} {:id "defn-/infer-let", :kind "defn-", :line 308, :end-line 315, :hash "-310092863"} {:id "defn-/infer-seq", :kind "defn-", :line 317, :end-line 322, :hash "-2028016492"} {:id "defn-/infer-var", :kind "defn-", :line 324, :end-line 330, :hash "325909027"} {:id "defn-/infer-set", :kind "defn-", :line 332, :end-line 340, :hash "1875378186"} {:id "defn-/infer-loop", :kind "defn-", :line 342, :end-line 357, :hash "867251552"} {:id "defn-/infer-recur", :kind "defn-", :line 359, :end-line 373, :hash "-1380623872"} {:id "defn-/infer-try", :kind "defn-", :line 375, :end-line 390, :hash "-481723416"} {:id "defn-/infer-raise", :kind "defn-", :line 392, :end-line 395, :hash "708997410"} {:id "defn-/infer-primitive-unary", :kind "defn-", :line 397, :end-line 403, :hash "300239028"} {:id "defn-/infer-primitive-binary", :kind "defn-", :line 405, :end-line 415, :hash "-679783036"} {:id "defn-/infer-java-new", :kind "defn-", :line 417, :end-line 421, :hash "-676160678"} {:id "defn-/infer-java-call", :kind "defn-", :line 423, :end-line 437, :hash "1132722729"} {:id "defn-/infer-java-static-call", :kind "defn-", :line 439, :end-line 452, :hash "-1746811078"} {:id "defn-/infer-java-get-field", :kind "defn-", :line 454, :end-line 457, :hash "-146759388"} {:id "defn-/infer-java-static-get-field", :kind "defn-", :line 459, :end-line 461, :hash "595849367"} {:id "defn-/ensure-assignable-field-type!", :kind "defn-", :line 463, :end-line 469, :hash "-97045908"} {:id "defn-/infer-java-set-field", :kind "defn-", :line 471, :end-line 476, :hash "277510053"} {:id "defn-/infer-java-static-set-field", :kind "defn-", :line 478, :end-line 482, :hash "-808600186"} {:id "def/expr-inferers", :kind "def", :line 484, :end-line 608, :hash "326331072"} {:id "defn/infer-expr", :kind "defn", :line 610, :end-line 617, :hash "-1459178635"} {:id "defn/infer-expr-type", :kind "defn", :line 619, :end-line 621, :hash "1740972133"} {:id "defn-/check-bool-contract", :kind "defn-", :line 623, :end-line 627, :hash "1265459629"} {:id "defn-/passthrough-invariant-ctx", :kind "defn-", :line 629, :end-line 631, :hash "-1920191979"} {:id "defn-/invariant-ctx", :kind "defn-", :line 633, :end-line 644, :hash "1279370076"} {:id "defn-/check-invariants", :kind "defn-", :line 646, :end-line 653, :hash "-1390776170"} {:id "defn-/check-fn-decl", :kind "defn-", :line 655, :end-line 673, :hash "575604567"} {:id "defn/check-module", :kind "defn", :line 675, :end-line 688, :hash "1200879305"}]}
+;; {:version 1, :tested-at "2026-03-14T08:13:00.113942-05:00", :module-hash "1711438958", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 4, :hash "1214713234"} {:id "form/1/declare", :kind "declare", :line 6, :end-line 6, :hash "-750848269"} {:id "form/2/declare", :kind "declare", :line 7, :end-line 7, :hash "83426057"} {:id "defn-/fail!", :kind "defn-", :line 9, :end-line 11, :hash "765867407"} {:id "defn-/decl-map", :kind "defn-", :line 13, :end-line 21, :hash "244840831"} {:id "defn-/fn-type", :kind "defn-", :line 23, :end-line 28, :hash "1095575499"} {:id "defn-/bottom-type", :kind "defn-", :line 30, :end-line 33, :hash "475588588"} {:id "defn-/bottom-type?", :kind "defn-", :line 35, :end-line 37, :hash "1715044112"} {:id "defn-/result", :kind "defn-", :line 39, :end-line 42, :hash "-1781274230"} {:id "defn-/local-type", :kind "defn-", :line 44, :end-line 46, :hash "-1632824710"} {:id "defn-/mutable-local?", :kind "defn-", :line 48, :end-line 50, :hash "1438220795"} {:id "defn-/bind-local", :kind "defn-", :line 52, :end-line 54, :hash "1658319653"} {:id "defn-/bind-mutable", :kind "defn-", :line 56, :end-line 60, :hash "-1396184064"} {:id "defn-/with-loop-types", :kind "defn-", :line 62, :end-line 64, :hash "208229580"} {:id "defn-/without-loop-types", :kind "defn-", :line 66, :end-line 68, :hash "932574932"} {:id "defn-/fn-decl-type", :kind "defn-", :line 70, :end-line 74, :hash "1335497367"} {:id "defn-/module-fn-env", :kind "defn-", :line 76, :end-line 87, :hash "1452456309"} {:id "defn-/make-ctx", :kind "defn-", :line 89, :end-line 96, :hash "-1280194419"} {:id "defn-/literal-type", :kind "defn-", :line 98, :end-line 109, :hash "-2129463170"} {:id "defn-/compatible-types?", :kind "defn-", :line 111, :end-line 115, :hash "1551296287"} {:id "defn-/ensure-type=", :kind "defn-", :line 117, :end-line 121, :hash "1746399400"} {:id "defn-/ensure-arity=", :kind "defn-", :line 123, :end-line 127, :hash "266695403"} {:id "defn-/join-types", :kind "defn-", :line 129, :end-line 135, :hash "-1353034608"} {:id "defn-/enum-pattern?", :kind "defn-", :line 137, :end-line 139, :hash "-31853100"} {:id "defn-/bind-literal-pattern", :kind "defn-", :line 141, :end-line 147, :hash "-2136209369"} {:id "defn-/bind-binder-pattern", :kind "defn-", :line 149, :end-line 153, :hash "1161467246"} {:id "defn-/bind-pattern", :kind "defn-", :line 155, :end-line 163, :hash "-1814155925"} {:id "defn-/infer-local", :kind "defn-", :line 165, :end-line 171, :hash "195910838"} {:id "defn-/infer-record-get", :kind "defn-", :line 173, :end-line 186, :hash "-361239966"} {:id "defn-/imported-runtime-available?", :kind "defn-", :line 188, :end-line 193, :hash "-1783818705"} {:id "defn-/ensure-constructible-type!", :kind "defn-", :line 195, :end-line 199, :hash "908869040"} {:id "defn-/infer-construct", :kind "defn-", :line 201, :end-line 216, :hash "-1360397945"} {:id "defn-/infer-variant", :kind "defn-", :line 218, :end-line 243, :hash "-1236364359"} {:id "defn-/infer-if", :kind "defn-", :line 245, :end-line 253, :hash "-2003732048"} {:id "defn-/infer-match", :kind "defn-", :line 255, :end-line 269, :hash "262906490"} {:id "defn-/infer-call", :kind "defn-", :line 271, :end-line 285, :hash "-1175533470"} {:id "defn-/infer-lambda", :kind "defn-", :line 287, :end-line 300, :hash "-582701779"} {:id "defn-/infer-binding", :kind "defn-", :line 302, :end-line 306, :hash "737212167"} {:id "defn-/infer-let", :kind "defn-", :line 308, :end-line 315, :hash "-310092863"} {:id "defn-/infer-seq", :kind "defn-", :line 317, :end-line 322, :hash "-2028016492"} {:id "defn-/infer-var", :kind "defn-", :line 324, :end-line 330, :hash "325909027"} {:id "defn-/infer-set", :kind "defn-", :line 332, :end-line 340, :hash "1875378186"} {:id "defn-/infer-loop", :kind "defn-", :line 342, :end-line 357, :hash "867251552"} {:id "defn-/infer-recur", :kind "defn-", :line 359, :end-line 373, :hash "-1380623872"} {:id "defn-/infer-try", :kind "defn-", :line 375, :end-line 390, :hash "-481723416"} {:id "defn-/infer-raise", :kind "defn-", :line 392, :end-line 395, :hash "708997410"} {:id "defn-/infer-primitive-unary", :kind "defn-", :line 397, :end-line 403, :hash "300239028"} {:id "defn-/infer-primitive-binary", :kind "defn-", :line 405, :end-line 415, :hash "-679783036"} {:id "defn-/seq-element-type", :kind "defn-", :line 417, :end-line 424, :hash "-948667098"} {:id "defn-/map-value-type", :kind "defn-", :line 426, :end-line 432, :hash "1293096732"} {:id "defn-/ensure-seq-type", :kind "defn-", :line 434, :end-line 438, :hash "1156209343"} {:id "defn-/ensure-map-type", :kind "defn-", :line 440, :end-line 444, :hash "1186104024"} {:id "defn-/infer-seq-unary", :kind "defn-", :line 446, :end-line 451, :hash "-2137238691"} {:id "defn-/infer-seq-element", :kind "defn-", :line 453, :end-line 459, :hash "-1943390793"} {:id "defn-/infer-seq-rest", :kind "defn-", :line 461, :end-line 468, :hash "-1159837909"} {:id "defn-/infer-seq-concat", :kind "defn-", :line 470, :end-line 484, :hash "1566324222"} {:id "defn-/infer-seq-get", :kind "defn-", :line 486, :end-line 499, :hash "662784337"} {:id "defn-/infer-map-empty", :kind "defn-", :line 501, :end-line 503, :hash "-313109806"} {:id "defn-/infer-map-set", :kind "defn-", :line 505, :end-line 522, :hash "-627309182"} {:id "defn-/infer-map-get", :kind "defn-", :line 524, :end-line 537, :hash "1449919953"} {:id "defn-/infer-map-contains", :kind "defn-", :line 539, :end-line 551, :hash "831295168"} {:id "defn-/infer-map-keys", :kind "defn-", :line 553, :end-line 558, :hash "48903908"} {:id "defn-/infer-java-new", :kind "defn-", :line 560, :end-line 564, :hash "-676160678"} {:id "defn-/infer-java-call", :kind "defn-", :line 566, :end-line 580, :hash "1132722729"} {:id "defn-/infer-java-static-call", :kind "defn-", :line 582, :end-line 595, :hash "-1746811078"} {:id "defn-/infer-java-get-field", :kind "defn-", :line 597, :end-line 600, :hash "-146759388"} {:id "defn-/infer-java-static-get-field", :kind "defn-", :line 602, :end-line 604, :hash "595849367"} {:id "defn-/ensure-assignable-field-type!", :kind "defn-", :line 606, :end-line 612, :hash "-97045908"} {:id "defn-/infer-java-set-field", :kind "defn-", :line 614, :end-line 619, :hash "277510053"} {:id "defn-/infer-java-static-set-field", :kind "defn-", :line 621, :end-line 625, :hash "-808600186"} {:id "def/expr-inferers", :kind "def", :line 627, :end-line 746, :hash "1675227802"} {:id "defn/infer-expr", :kind "defn", :line 748, :end-line 755, :hash "-1459178635"} {:id "defn/infer-expr-type", :kind "defn", :line 757, :end-line 759, :hash "1740972133"} {:id "defn-/check-bool-contract", :kind "defn-", :line 761, :end-line 765, :hash "1265459629"} {:id "defn-/passthrough-invariant-ctx", :kind "defn-", :line 767, :end-line 769, :hash "-1920191979"} {:id "defn-/invariant-ctx", :kind "defn-", :line 771, :end-line 782, :hash "1279370076"} {:id "defn-/check-invariants", :kind "defn-", :line 784, :end-line 791, :hash "-1390776170"} {:id "defn-/check-fn-decl", :kind "defn-", :line 793, :end-line 811, :hash "575604567"} {:id "defn/check-module", :kind "defn", :line 813, :end-line 826, :hash "1200879305"}]}
 ;; clj-mutate-manifest-end

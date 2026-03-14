@@ -111,7 +111,7 @@ Do not consider a change complete until all applicable checks pass:
 
 Current pinned SHAs:
 
-- `clj-mutate`: `5f8262718d1a2791cc89424036d4fb4e7007ff91`
+- `clj-mutate`: `a95a3352cd5fe104dac8e7a5c0b97547ba5718d5`
 - `dependency-checker`: `e8f35792434adb35fb6b99f5c3f9ab2ab24a0279`
 - `speclj-structure-check`: `7cc804c4e99b3482ca1d8a26b735ed41751a03ab`
 - `crap4clj`: `9f12da1b09bc1177f8f058108cf22a73bc9a97a0`

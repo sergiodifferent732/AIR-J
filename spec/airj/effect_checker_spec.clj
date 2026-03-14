@@ -436,6 +436,21 @@
                          :expr 1}}
               {})))
 
+  (it "treats caught foreign throws as handled while preserving catch and finally effects"
+    (should= #{'State.Write}
+             (sut/expr-effects
+              {:op :try
+               :body {:op :string->int
+                      :arg "7"}
+               :catches [{:type '(Java java.lang.NumberFormatException)
+                          :name 'ex
+                          :body 0}]
+               :finally {:op :var
+                         :name 'counter
+                         :type 'Int
+                         :init 0}}
+              {})))
+
   (it "rejects unsupported dynamic call effect inference"
     (should-throw clojure.lang.ExceptionInfo
                   "Unsupported call effect inference."

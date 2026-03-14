@@ -15,6 +15,8 @@
                (sut/lower-type 'String ctx))
       (should= "java/lang/StringBuilder"
                (sut/lower-type '(Java java.lang.StringBuilder) ctx))
+      (should= "java/util/Map"
+               (sut/lower-type '(Map String Int) ctx))
       (should= "example/types$Result"
                (sut/lower-type 'Result ctx))
       (should= "example/types$Result"
@@ -114,7 +116,10 @@
   (it "rejects unsupported JVM types"
     (should-throw clojure.lang.ExceptionInfo
                   "Unsupported JVM type."
-                  (sut/lower-type 'MissingType)))
+                  (sut/lower-type 'MissingType))
+    (should-throw clojure.lang.ExceptionInfo
+                  "Unsupported JVM type."
+                  (sut/lower-type '(Map Int String))))
 
   (it "rejects unknown lowered locals"
     (should-throw clojure.lang.ExceptionInfo

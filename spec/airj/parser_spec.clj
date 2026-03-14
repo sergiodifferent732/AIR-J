@@ -614,7 +614,45 @@
                                                     ","]}}
                                       1
                                       3]}
-                              0]}}
+                             0]}}
+               (-> ast :decls first :body))))
+
+  (it "parses sequence rest concat and canonical map primitives"
+    (let [source "(module example/data-core
+                    (imports)
+                    (export build)
+                    (fn build
+                      (params (items (Seq String)))
+                      (returns (Map String Int))
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (map-set
+                        (map-set
+                          (map-empty Int)
+                          \"head\"
+                          (string-length (seq-first (local items))))
+                        \"tail-size\"
+                        (seq-length
+                          (seq-concat
+                            (seq-rest (local items))
+                            (string-split-on \"z\" \",\"))))))"
+          ast (sut/parse-module source)]
+      (should= {:op :map-set
+                :args [{:op :map-set
+                        :args [{:op :map-empty
+                                :value-type 'Int}
+                               "head"
+                               {:op :string-length
+                                :arg {:op :seq-first
+                                      :arg {:op :local :name 'items}}}]}
+                       "tail-size"
+                       {:op :seq-length
+                        :arg {:op :seq-concat
+                              :args [{:op :seq-rest
+                                      :arg {:op :local :name 'items}}
+                                     {:op :string-split-on
+                                      :args ["z" ","]}]}}]}
                (-> ast :decls first :body))))
 
   (it "rejects when as a non-canonical persisted form"
