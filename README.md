@@ -27,6 +27,7 @@ AIR-J is not trying to be a nicer Java, Kotlin, or Clojure for humans. The persi
 That makes AIR-J closer to a writable canonical IR than to a human-oriented surface language.
 
 For the authoritative design and language contract, see:
+- [language-reference.md](/Users/unclebob/projects/AIR-J/language-reference.md)
 - [notes.md](/Users/unclebob/projects/AIR-J/notes.md)
 - [formal-v0-spec.md](/Users/unclebob/projects/AIR-J/formal-v0-spec.md)
 - [AGENTS.md](/Users/unclebob/projects/AIR-J/AGENTS.md)

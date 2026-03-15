@@ -2,6 +2,8 @@
 
 This document defines the version 0 language contract for AIR-J. It is written to support parser, normalizer, type checker, effect checker, and JVM backend implementation.
 
+For an implementation-synchronized usage guide, see [language-reference.md](/Users/unclebob/projects/AIR-J/language-reference.md).
+
 If this document conflicts with a future ergonomic authoring layer, this document wins for persisted AIR-J artifacts.
 
 ## 1. Scope
