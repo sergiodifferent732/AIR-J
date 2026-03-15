@@ -1,0 +1,133 @@
+(module example/ledger_test_suite
+  (imports
+    (airj airj/test TestOutcome
+                          assert-int-eq
+                          assert-string-eq)
+    (airj example/ledger balance-label
+                          deposit
+                          open-account
+                          total-balance
+                          transfer
+                          withdraw))
+  (export suite)
+
+  (fn opens-at-zero
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-int-eq)
+          "opens account at zero"
+          (record-get (call (local open-account) "alice") balance)
+          0))
+
+  (fn deposits-positive-amount
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-int-eq)
+          "deposit increases balance"
+          (record-get
+            (call (local deposit)
+                  (call (local open-account) "alice")
+                  8)
+            balance)
+          8))
+
+  (fn withdraws-within-balance
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-int-eq)
+          "withdraw decreases balance"
+          (record-get
+            (call (local withdraw)
+                  (call (local deposit)
+                        (call (local open-account) "alice")
+                        9)
+                  4)
+            balance)
+          5))
+
+  (fn transfer-preserves-total
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-int-eq)
+          "transfer preserves total"
+          (let ((result (call (local transfer)
+                              (call (local deposit)
+                                    (call (local open-account) "alice")
+                                    10)
+                              (call (local deposit)
+                                    (call (local open-account) "bob")
+                                    3)
+                              4)))
+            (call (local total-balance)
+                  (record-get (local result) from)
+                  (record-get (local result) to)))
+          13))
+
+  (fn transfer-updates-both-sides
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-string-eq)
+          "transfer updates both accounts"
+          (let ((result (call (local transfer)
+                              (call (local deposit)
+                                    (call (local open-account) "alice")
+                                    10)
+                              (call (local deposit)
+                                    (call (local open-account) "bob")
+                                    1)
+                              3)))
+            (string-concat
+              (call (local balance-label) (record-get (local result) from))
+              (string-concat
+                "|"
+                (call (local balance-label) (record-get (local result) to)))))
+          "alice:7|bob:4"))
+
+  (fn labels-balance
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-string-eq)
+          "labels balance"
+          (call (local balance-label)
+                (call (local deposit)
+                      (call (local open-account) "alice")
+                      6))
+          "alice:6"))
+
+  (fn suite
+    (params)
+    (returns (Seq TestOutcome))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (seq-append
+      (seq-append
+        (seq-append
+          (seq-append
+            (seq-append
+              (seq-append
+                (seq-empty TestOutcome)
+                (call (local opens-at-zero)))
+              (call (local deposits-positive-amount)))
+            (call (local withdraws-within-balance)))
+          (call (local transfer-preserves-total)))
+        (call (local transfer-updates-both-sides)))
+      (call (local labels-balance)))))

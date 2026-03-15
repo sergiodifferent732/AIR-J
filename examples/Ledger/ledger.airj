@@ -1,0 +1,76 @@
+(module example/ledger
+  (imports)
+  (export Account
+          Transfer
+          open-account
+          deposit
+          withdraw
+          transfer
+          balance-label
+          total-balance)
+
+  (data Account
+    (field id String)
+    (field balance Int))
+
+  (data Transfer
+    (field from Account)
+    (field to Account))
+
+  (fn open-account
+    (params (id String))
+    (returns Account)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (construct Account (local id) 0))
+
+  (fn deposit
+    (params (account Account) (amount Int))
+    (returns Account)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (construct Account
+               (record-get (local account) id)
+               (int-add (record-get (local account) balance) (local amount))))
+
+  (fn withdraw
+    (params (account Account) (amount Int))
+    (returns Account)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (construct Account
+               (record-get (local account) id)
+               (int-sub (record-get (local account) balance) (local amount))))
+
+  (fn transfer
+    (params (from Account) (to Account) (amount Int))
+    (returns Transfer)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (construct Transfer
+               (call (local withdraw) (local from) (local amount))
+               (call (local deposit) (local to) (local amount))))
+
+  (fn balance-label
+    (params (account Account))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (string-concat
+      (string-concat (record-get (local account) id) ":")
+      (int->string (record-get (local account) balance))))
+
+  (fn total-balance
+    (params (left Account) (right Account))
+    (returns Int)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (int-add
+      (record-get (local left) balance)
+      (record-get (local right) balance))))
