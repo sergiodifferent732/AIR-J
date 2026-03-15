@@ -77,4 +77,21 @@
                                                (ensures true)
                                                (local nope)))"}]
       (should= #{'alpha/math 'example/use}
-               (set (keys (sut/reachable-source-map project-sources 'example/use)))))))
+               (set (keys (sut/reachable-source-map project-sources 'example/use))))))
+
+  (it "adds reachable standard modules to the compilation source map"
+    (let [project-sources {'example/tool "(module example/tool
+                                           (imports
+                                             (airj airj/file read-bytes-result)
+                                             (airj airj/json parse-result)
+                                             (airj airj/process run-result))
+                                           (export main)
+                                           (fn main
+                                             (params)
+                                             (returns Int)
+                                             (effects ())
+                                             (requires true)
+                                             (ensures true)
+                                             0))"}]
+      (should= #{'airj/core 'airj/file 'airj/json 'airj/process 'example/tool}
+               (set (keys (sut/compilation-source-map project-sources 'example/tool)))))))

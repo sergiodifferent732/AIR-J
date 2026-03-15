@@ -44,6 +44,14 @@
                                              args))))]
     (.waitFor process)))
 
+(defn- run-main-process-with-classpath
+  [classpath class-name & args]
+  (let [process (.start (ProcessBuilder.
+                         (into-array String
+                                     (concat [(java-command) "-cp" classpath class-name]
+                                             args))))]
+    (.waitFor process)))
+
 (describe "compiler"
   (it "compiles AIR-J source into executable module class bytes"
     (let [source "(module example/build
@@ -1406,3 +1414,67 @@
       (should= 1 result)
       (should= "{\"tool\":\"ok\"}"
                (slurp output))))
+
+  (it "builds a project-directory tool workflow into runnable classes on disk"
+    (let [project-dir (.toString (java.nio.file.Files/createTempDirectory "airj-project-tool"
+                                                                          (make-array java.nio.file.attribute.FileAttribute 0)))
+          output-dir (.toString (java.nio.file.Files/createTempDirectory "airj-project-tool-classes"
+                                                                         (make-array java.nio.file.attribute.FileAttribute 0)))
+          input (.toString (java.nio.file.Files/createTempFile "airj-project-tool-input"
+                                                               ".json"
+                                                               (make-array java.nio.file.attribute.FileAttribute 0)))
+          output (.toString (java.nio.file.Files/createTempFile "airj-project-tool-output"
+                                                                ".json"
+                                                                (make-array java.nio.file.attribute.FileAttribute 0)))
+          _ (spit (io/file project-dir "tool.airj")
+                  "(module example/tool
+                     (imports
+                       (airj airj/bytes utf8-encode utf8-decode)
+                       (airj airj/env get)
+                       (airj airj/file read-string-result write-string-result)
+                       (airj airj/json parse-result write)
+                       (airj airj/process run-result))
+                     (export main)
+                     (fn main
+                       (params (args StringSeq))
+                       (returns Int)
+                       (effects (Env.Read File.Read File.Write Process.Run Foreign.Throw))
+                       (requires true)
+                       (ensures true)
+                       (match
+                         (call (local get) \"PATH\")
+                         (case (Some path)
+                           (match
+                             (call (local read-string-result) (seq-get (local args) 0))
+                             (case (Ok text)
+                               (match
+                                 (call (local run-result)
+                                       (string-split-on \"/bin/cat\" \"\\u0000\")
+                                       (call (local utf8-encode) (local text)))
+                                 (case (Ok process)
+                                   (match
+                                     (call (local parse-result)
+                                           (call (local utf8-decode)
+                                                 (record-get (local process) stdout)))
+                                     (case (Ok payload)
+                                       (seq
+                                         (call (local write-string-result)
+                                               (seq-get (local args) 1)
+                                               (call (local write) (local payload)))
+                                         17))
+                                     (case (Err error)
+                                       4)))
+                                 (case (Err error)
+                                   3)))
+                             (case (Err error)
+                               2)))
+                         (case None
+                           1))))")
+          _ (spit input "{\"tool\":\"ok\"}")
+          _ (spit output "")
+          _ (sut/build-project-dir! project-dir 'example/tool output-dir)
+          classpath (str output-dir java.io.File/pathSeparator
+                         (System/getProperty "java.class.path"))
+          exit-code (run-main-process-with-classpath classpath "example.tool" input output)]
+      (should= 17 exit-code)
+      (should= "{\"tool\":\"ok\"}" (slurp output))))

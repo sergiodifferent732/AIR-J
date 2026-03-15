@@ -30,7 +30,7 @@
                         :module-interface []
                         :host-runtime []
                         :resolver [:expr-walker :imported-interfaces]
-                        :project-graph [:normalizer :parser]
+                        :project-graph [:normalizer :parser :stdlib]
                         :project-files [:project-graph :project-sources]
                         :project-sources [:interface-sources :normalizer :parser :project-graph :stdlib]
                         :stdlib [:interface-sources :parser]

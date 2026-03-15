@@ -445,6 +445,33 @@
       (should= "1"
                (sut/run ["run" "--project-dir" project-dir "example/use"] "ignored"))))
 
+  (it "builds a project-directory tool workflow with reachable standard modules"
+    (let [project-dir (.toString (java.nio.file.Files/createTempDirectory "airj-cli-project-tool"
+                                                                          (make-array java.nio.file.attribute.FileAttribute 0)))
+          output-dir (.toString (java.nio.file.Files/createTempDirectory "airj-cli-project-tool-classes"
+                                                                         (make-array java.nio.file.attribute.FileAttribute 0)))
+          _ (spit (java.io.File. project-dir "tool.airj")
+                  "(module example/tool
+                     (imports
+                       (airj airj/env get)
+                       (airj airj/file read-string-result)
+                       (airj airj/json parse-result))
+                     (export main)
+                     (fn main
+                       (params (args StringSeq))
+                       (returns Int)
+                       (effects ())
+                       (requires true)
+                       (ensures true)
+                       1))")
+          result (sut/run ["build" "--project-dir" project-dir "example/tool" output-dir] "ignored")]
+      (should-contain "\"example/tool\"" result)
+      (should-contain "\"airj/env\"" result)
+      (should-contain "\"airj/file\"" result)
+      (should-contain "\"airj/core\"" result)
+      (should-contain "\"airj/json\"" result)
+      (should-contain output-dir result)))
+
   (it "surfaces imported type invariant failures when running from a project directory"
     (let [project-dir (.toString (java.nio.file.Files/createTempDirectory "airj-cli-project-invariant"
                                                                           (make-array java.nio.file.attribute.FileAttribute 0)))

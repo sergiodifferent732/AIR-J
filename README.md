@@ -45,6 +45,7 @@ Implemented areas include:
 - explicit stdin/stdout operations
 - explicit Java interop
 - host-backed modules for callback-oriented JVM frameworks such as Processing
+- canonical standard modules for `airj/core`, `airj/bytes`, `airj/env`, `airj/file`, `airj/json`, and `airj/process`
 - JVM lowering and bytecode emission
 
 AIR-J is already far enough along to compile and run nontrivial programs, but it is still evolving toward a fuller AI-oriented language/runtime.
@@ -72,6 +73,24 @@ The generated JVM `main` wrapper behaves like this:
 - if AIR-J `main` returns `Int`, that becomes the JVM process exit code
 - other return values are not printed automatically by the generated JVM wrapper
 - program output should be done explicitly with `io/print` or `io/println`
+
+For boundary-heavy programs, the canonical rule is:
+- raw boundary ops may carry explicit host effects and `Foreign.Throw`
+- `*-result` wrapper functions should convert recoverable host failures into `(Result _ Diagnostic)`
+- `Diagnostic.message` should stay stable and machine-oriented
+- `Diagnostic.detail` should identify the relevant input, path, or context
+
+## Standard Modules
+
+AIR-J keeps host interaction in a small canonical module surface:
+- `airj/core`: canonical carriers such as `Diagnostic`, `Interchange`, `Option`, and `Result`
+- `airj/bytes`: raw byte values and UTF-8 conversion
+- `airj/env`: explicit environment reads
+- `airj/file`: canonical filesystem boundary
+- `airj/json`: canonical JSON interchange boundary
+- `airj/process`: canonical subprocess boundary
+
+These modules exist to reduce representation drift. They are the default machine-facing boundary, and raw Java interop should be reserved for intentional foreign integration.
 
 ## Development Workflow
 
@@ -121,6 +140,12 @@ Build it:
 
 ```bash
 clj -M -m airj.cli build hello.airj target/classes
+```
+
+If the program only uses pure computation and direct Java interop, the generated classes can usually be run directly from the output directory:
+
+```bash
+java -cp target/classes example.hello
 ```
 
 ## Sample Program: Prime Factors
@@ -226,6 +251,26 @@ AIR-J can optionally emit a class that extends a Java host superclass:
 ```
 
 This is the compatibility hook used for Processing-style callback frameworks and similar JVM libraries.
+
+## Packaging And Launch
+
+The canonical development path is still:
+
+```bash
+clj -M -m airj.cli run path/to/program.airj ...
+```
+
+For built classes, AIR-J has two runtime shapes:
+- self-contained generated classes that only need the output directory on the classpath
+- generated classes that rely on AIR-J runtime helpers such as JSON, file, process, or host support
+
+For the second case, launch with the built output directory plus the current AIR-J runtime classpath:
+
+```bash
+java -cp "target/classes:$(clj -Spath)" example.tool input.json output.json
+```
+
+That keeps the persisted AIR-J program canonical while making the host/runtime dependency boundary explicit.
 
 ## Why Canonical Built-Ins Instead of “Just Use Java”
 

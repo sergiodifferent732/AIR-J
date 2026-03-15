@@ -667,4 +667,7 @@ java -cp target/classes example.app
 - `airj/file` defines canonical filesystem boundaries.
 - `airj/json` defines the canonical JSON interchange boundary.
 - Recoverable boundary failures should prefer `Result ... Diagnostic`.
+- Raw boundary functions may still expose explicit host effects and `Foreign.Throw`, but standard `*-result` wrappers should carry recoverable failures as canonical AIR-J data.
+- `Diagnostic.message` should remain stable and machine-oriented, while `Diagnostic.detail` should carry the relevant path, input, or boundary context.
+- Standard modules should remain small and canonical: `airj/core`, `airj/bytes`, `airj/env`, `airj/file`, `airj/json`, and `airj/process`.
 - Host-library details belong behind these module boundaries, not in ordinary AIR-J programs.

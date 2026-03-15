@@ -38,6 +38,32 @@
       (should= #{'alpha/math 'example/use}
                (set (keys (sut/reachable-source-map sources 'example/use))))))
 
+  (it "ignores canonical standard-module imports when traversing project modules"
+    (let [sources {'alpha/math "(module alpha/math
+                                  (imports)
+                                  (export tick)
+                                  (fn tick
+                                    (params (x Int))
+                                    (returns Int)
+                                    (effects ())
+                                    (requires true)
+                                    (ensures true)
+                                    (local x)))"
+                   'example/use "(module example/use
+                                   (imports
+                                     (airj airj/file read-string-result)
+                                     (airj alpha/math tick))
+                                   (export main)
+                                   (fn main
+                                     (params)
+                                     (returns Int)
+                                     (effects ())
+                                     (requires true)
+                                     (ensures true)
+                                     (call (local tick) 1)))"}]
+      (should= #{'alpha/math 'example/use}
+               (set (keys (sut/reachable-source-map sources 'example/use))))))
+
   (it "fails when a reachable imported module source is missing"
     (let [sources {'example/use "(module example/use
                                    (imports

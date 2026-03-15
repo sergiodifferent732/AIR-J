@@ -1,6 +1,7 @@
 (ns airj.project-graph
   (:require [airj.normalizer :as normalizer]
-            [airj.parser :as parser]))
+            [airj.parser :as parser]
+            [airj.stdlib :as stdlib]))
 
 (defn direct-airj-imports
   [source]
@@ -9,7 +10,8 @@
        normalizer/normalize-module
        :imports
        (filter #(= :airj-import (:op %)))
-       (map :module)))
+       (map :module)
+       (remove stdlib/stdlib-module?)))
 
 (defn- module-source
   [sources module-name]
@@ -49,5 +51,5 @@
   (second (visit-module sources root-module-name #{} [] {})))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-12T15:34:01.268527-05:00", :module-hash "-402421941", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "-1184469576"} {:id "defn/direct-airj-imports", :kind "defn", :line 5, :end-line 12, :hash "1755463769"} {:id "defn-/module-source", :kind "defn-", :line 14, :end-line 18, :hash "476968309"} {:id "defn-/fail-on-cycle!", :kind "defn-", :line 20, :end-line 25, :hash "-134953179"} {:id "defn-/visit-module", :kind "defn-", :line 27, :end-line 45, :hash "-2024500094"} {:id "defn/reachable-source-map", :kind "defn", :line 47, :end-line 49, :hash "-894799540"}]}
+;; {:version 1, :tested-at "2026-03-14T20:24:18.699791-05:00", :module-hash "-927930325", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 4, :hash "-2043357509"} {:id "defn/direct-airj-imports", :kind "defn", :line 6, :end-line 14, :hash "2106995193"} {:id "defn-/module-source", :kind "defn-", :line 16, :end-line 20, :hash "476968309"} {:id "defn-/fail-on-cycle!", :kind "defn-", :line 22, :end-line 27, :hash "-134953179"} {:id "defn-/visit-module", :kind "defn-", :line 29, :end-line 47, :hash "-2024500094"} {:id "defn/reachable-source-map", :kind "defn", :line 49, :end-line 51, :hash "-894799540"}]}
 ;; clj-mutate-manifest-end

@@ -987,6 +987,11 @@ This order is non-normative, but it matches the dependency structure of the spec
 ## Standard Modules
 
 - `airj/core` contains canonical machine-facing carriers such as `Diagnostic`, `Option`, `Result`, and `Interchange`.
+- `airj/bytes` contains canonical byte-oriented host data.
+- `airj/env` contains the canonical environment-read boundary.
 - `airj/file` contains canonical filesystem boundary operations.
 - `airj/json` contains the canonical JSON parse/emit boundary for interchange values.
+- `airj/process` contains the canonical subprocess boundary.
 - Recoverable standard-module failures should prefer `Result ... Diagnostic` over raw exception text.
+- Raw boundary operations may still expose explicit host effects and `Foreign.Throw`, but wrapper functions should convert recoverable failures into canonical AIR-J data.
+- `Diagnostic.message` should remain stable and machine-oriented; `Diagnostic.detail` should carry the relevant path, input, or boundary context.
