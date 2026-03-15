@@ -477,6 +477,41 @@
       (should-contain "\"airj/json\"" result)
       (should-contain output-dir result)))
 
+  (it "builds a runnable jar from a project directory"
+    (let [project-dir (.toString (java.nio.file.Files/createTempDirectory "airj-cli-project-jar"
+                                                                          (make-array java.nio.file.attribute.FileAttribute 0)))
+          jar-path (.toString (java.nio.file.Files/createTempFile "airj-cli-project" ".jar"
+                                                                  (make-array java.nio.file.attribute.FileAttribute 0)))
+          _ (spit (java.io.File. project-dir "math.airj")
+                  "(module alpha/math
+                     (imports)
+                     (export room)
+                     (fn room
+                       (params)
+                       (returns String)
+                       (effects ())
+                       (requires true)
+                       (ensures true)
+                       \"Wumpus\"))")
+          _ (spit (java.io.File. project-dir "main.airj")
+                  "(module example/main
+                     (imports
+                       (airj alpha/math room))
+                     (export main)
+                     (fn main
+                       (params)
+                       (returns Int)
+                       (effects (Stdout.Write))
+                       (requires true)
+                       (ensures true)
+                       (seq
+                         (io/println (call (local room)))
+                         0)))")
+          result (sut/run ["build" "--project-dir" project-dir "--jar" jar-path "example/main"] "ignored")]
+      (should-contain ":jar" result)
+      (should-contain jar-path result)
+      (should (.exists (java.io.File. jar-path)))))
+
   (it "surfaces imported type invariant failures when running from a project directory"
     (let [project-dir (.toString (java.nio.file.Files/createTempDirectory "airj-cli-project-invariant"
                                                                           (make-array java.nio.file.attribute.FileAttribute 0)))

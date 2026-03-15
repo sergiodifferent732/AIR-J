@@ -432,6 +432,40 @@
       (should= ">alpha" (:out run-result))
       (should= "" (:err run-result))))
 
+  (it "writes executable jars for reachable project modules"
+    (let [module-sources {'alpha/math "(module alpha/math
+                                         (imports)
+                                         (export room)
+                                         (fn room
+                                           (params)
+                                           (returns String)
+                                           (effects ())
+                                           (requires true)
+                                           (ensures true)
+                                           \"Wumpus\"))"
+                         'example/main "(module example/main
+                                          (imports
+                                            (airj alpha/math room))
+                                          (export main)
+                                          (fn main
+                                            (params)
+                                            (returns Int)
+                                            (effects (Stdout.Write))
+                                            (requires true)
+                                            (ensures true)
+                                            (seq
+                                              (io/println (call (local room)))
+                                              0)))"}
+          jar-path (.toString (java.nio.file.Files/createTempFile "airj-project-run" ".jar"
+                                                                  (make-array java.nio.file.attribute.FileAttribute 0)))
+          written (sut/build-project-source-jar! module-sources 'example/main jar-path)
+          run-result (run-jar-process jar-path "")]
+      (should= {:jar jar-path} written)
+      (should (.exists (io/file jar-path)))
+      (should= 0 (:exit run-result))
+      (should= "Wumpus\n" (:out run-result))
+      (should= "" (:err run-result))))
+
   (it "loads emitted class files from disk and executes them"
     (let [source "(module example/on-disk
                     (imports)
