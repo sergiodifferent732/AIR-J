@@ -1,5 +1,6 @@
 (ns airj.jvm-emitter-spec
-  (:require [airj.jvm-emitter :as sut]
+  (:require [airj.jvm-emit-data :as emit-data]
+            [airj.jvm-emitter :as sut]
             [airj.text-runtime :as text-runtime]
             [clojure.java.io :as io]
             [speclj.core :refer :all])
@@ -434,6 +435,85 @@
       (emit-cast-or-unbox (recorder cast-calls) "java/lang/Number" "java/lang/String")
       (should= [[:type Opcodes/CHECKCAST "java/lang/String"]]
                @cast-calls)))
+
+  (it "casts if branches to the merged reference type"
+    (let [emit-if @#'airj.jvm-emitter/emit-if
+          calls (atom [])
+          recorder (proxy [MethodVisitor] [393216]
+                     (visitJumpInsn [opcode label]
+                       (swap! calls conj [:jump opcode]))
+                     (visitLabel [label]
+                       (swap! calls conj [:label]))
+                     (visitTypeInsn [opcode type]
+                       (swap! calls conj [:type opcode type])))
+          emit-expr (fn [_mv expr _env]
+                      (when-let [jvm-type (:jvm-type expr)]
+                        (when (and (string? jvm-type)
+                                   (not= jvm-type "airj/core$Option"))
+                          (swap! calls conj [:branch jvm-type]))))
+          expr {:op :jvm-if
+                :test {:op :jvm-boolean
+                       :value true
+                       :jvm-type :boolean}
+                :then {:op :jvm-local
+                       :name 'left
+                       :jvm-type "airj/core$Option$Some"}
+                :else {:op :jvm-local
+                       :name 'right
+                       :jvm-type "airj/core$Option$None"}
+                :jvm-type "airj/core$Option"}]
+      (with-redefs [airj.jvm-emitter/emit-expr emit-expr]
+        (emit-if recorder expr {}))
+      (should-contain [:type Opcodes/CHECKCAST "airj/core$Option"] @calls)
+      (should= 2 (count (filter #(= [:type Opcodes/CHECKCAST "airj/core$Option"] %) @calls)))))
+
+  (it "casts invoke-static arguments to declared parameter types"
+    (let [emit-invoke-static @#'airj.jvm-emitter/emit-invoke-static
+          calls (atom [])
+          recorder (proxy [MethodVisitor] [393216]
+                     (visitTypeInsn [opcode type]
+                       (swap! calls conj [:type opcode type]))
+                     (visitMethodInsn [opcode owner name descriptor is-interface]
+                       (swap! calls conj [:method opcode owner name descriptor is-interface])))
+          emit-expr (fn [_mv _expr _env]
+                      (swap! calls conj [:emit]))]
+      (with-redefs [airj.jvm-emitter/emit-expr emit-expr]
+        (emit-invoke-static recorder
+                            {:owner "example/tests"
+                             :name 'accept
+                             :args [{:op :jvm-local
+                                     :name 'value
+                                     :jvm-type "java/lang/Object"}]
+                             :parameter-types ["airj/core$Option"]
+                             :return-type "airj/test$TestOutcome"}
+                            {}))
+      (should= [[:emit]
+                [:type Opcodes/CHECKCAST "airj/core$Option"]
+                [:method Opcodes/INVOKESTATIC "example/tests" "accept" "(Lairj/core$Option;)Lairj/test$TestOutcome;" false]]
+               @calls)))
+
+  (it "casts emitted variants to their declared union type"
+    (let [calls (atom [])
+          recorder (proxy [MethodVisitor] [393216]
+                     (visitTypeInsn [opcode type]
+                       (swap! calls conj [:type opcode type]))
+                     (visitInsn [opcode]
+                       (swap! calls conj [:insn opcode]))
+                     (visitMethodInsn [opcode owner name descriptor is-interface]
+                       (swap! calls conj [:method opcode owner name descriptor is-interface])))]
+      (emit-data/emit-variant recorder
+                              {:op :jvm-variant
+                               :class-name "airj/core$Option$Some"
+                               :parameter-types ["java/lang/Object"]
+                               :args [{:op :jvm-string
+                                       :value "wumpus"
+                                       :jvm-type "java/lang/String"}]
+                               :jvm-type "airj/core$Option"}
+                              {}
+                              {:emit-expr (fn [_mv _expr _env] nil)
+                               :emit-box-if-needed (fn [_mv _actual _runtime] nil)
+                               :constructor-descriptor-for-types (fn [_] "(Ljava/lang/Object;)V")})
+      (should-contain [:type Opcodes/CHECKCAST "airj/core$Option"] @calls)))
 
   (it "emits a host-backed module class with instance bridge methods"
     (let [plan {:op :jvm-module

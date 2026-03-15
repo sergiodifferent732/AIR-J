@@ -1,8 +1,13 @@
 (module example/hunt_the_wumpus_tests
   (imports
+    (airj airj/core parse-int)
     (airj airj/test TestOutcome
                           assert-bool-eq
+                          assert-err-message
                           assert-int-eq
+                          assert-none-string
+                          assert-ok-int
+                          assert-some-string
                           assert-string-eq)
     (airj airj/test-runner run)
     (airj example/wumpus_logic GameState
@@ -21,6 +26,10 @@
   (export opening-state
           parses-command-verb
           parses-command-arg
+          returns-none-when-command-room-missing
+          returns-some-when-command-room-present
+          parses-command-room
+          reports-invalid-command-room
           recognizes-adjacent-room
           rejects-invalid-room
           reports-wumpus-warning
@@ -75,6 +84,53 @@
           "parses command arg"
           (call (local command-arg) "shoot 11")
           "11"))
+
+  (fn returns-none-when-command-room-missing
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-none-string)
+          "returns none when command room missing"
+          (if (string-empty? (call (local command-arg) "move"))
+            (variant (Option String) None)
+            (variant (Option String) Some (call (local command-arg) "move")))))
+
+  (fn returns-some-when-command-room-present
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-some-string)
+          "returns some when command room present"
+          (if (string-empty? (call (local command-arg) "shoot 11"))
+            (variant (Option String) None)
+            (variant (Option String) Some (call (local command-arg) "shoot 11")))
+          "11"))
+
+  (fn parses-command-room
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-ok-int)
+          "parses command room"
+          (call (local parse-int) (call (local command-arg) "shoot 11"))
+          11))
+
+  (fn reports-invalid-command-room
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-err-message)
+          "reports invalid command room"
+          (call (local parse-int) (call (local command-arg) "shoot boom"))
+          "Invalid integer."))
 
   (fn recognizes-adjacent-room
     (params)
@@ -270,11 +326,21 @@
     (effects ())
     (requires true)
     (ensures true)
-    (seq-append
+    (seq-concat
       (seq-append
-        (seq-empty TestOutcome)
-        (call (local parses-command-verb)))
-      (call (local parses-command-arg))))
+        (seq-append
+          (seq-append
+            (seq-empty TestOutcome)
+            (call (local parses-command-verb)))
+          (call (local parses-command-arg)))
+        (call (local returns-none-when-command-room-missing)))
+      (seq-append
+        (seq-append
+          (seq-append
+            (seq-empty TestOutcome)
+            (call (local returns-some-when-command-room-present)))
+          (call (local parses-command-room)))
+        (call (local reports-invalid-command-room)))))
 
   (fn warning-tests
     (params)

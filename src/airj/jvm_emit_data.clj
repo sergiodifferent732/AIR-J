@@ -66,7 +66,10 @@
 
 (defn emit-variant
   [^MethodVisitor mv expr env opts]
-  (emit-construct mv expr env opts))
+  (emit-construct mv expr env opts)
+  (when (and (string? (:jvm-type expr))
+             (not= (:class-name expr) (:jvm-type expr)))
+    (.visitTypeInsn mv Opcodes/CHECKCAST (:jvm-type expr))))
 
 (defn emit-map-empty
   [^MethodVisitor mv]
@@ -230,5 +233,5 @@
     (.visitLabel mv end-label)))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-14T09:34:25.342413-05:00", :module-hash "-599899254", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 2, :hash "-732582226"} {:id "defn/emit-construct", :kind "defn", :line 4, :end-line 18, :hash "881575364"} {:id "defn/emit-record-get", :kind "defn", :line 20, :end-line 29, :hash "1105717458"} {:id "defn/emit-java-get-field", :kind "defn", :line 31, :end-line 38, :hash "72788422"} {:id "defn/emit-java-static-get-field", :kind "defn", :line 40, :end-line 46, :hash "1885727713"} {:id "defn/emit-java-set-field", :kind "defn", :line 48, :end-line 56, :hash "-972448071"} {:id "defn/emit-java-static-set-field", :kind "defn", :line 58, :end-line 65, :hash "-198808029"} {:id "defn/emit-variant", :kind "defn", :line 67, :end-line 69, :hash "1550034548"} {:id "defn/emit-map-empty", :kind "defn", :line 71, :end-line 80, :hash "-1855517679"} {:id "defn/emit-map-set", :kind "defn", :line 82, :end-line 129, :hash "1728533096"} {:id "defn/emit-map-get", :kind "defn", :line 131, :end-line 171, :hash "289727427"} {:id "defn/emit-map-contains", :kind "defn", :line 173, :end-line 182, :hash "-1455959828"} {:id "defn/emit-map-keys", :kind "defn", :line 184, :end-line 200, :hash "723777927"} {:id "defn/emit-instance-of", :kind "defn", :line 202, :end-line 205, :hash "1626769910"} {:id "defn/emit-variant-field", :kind "defn", :line 207, :end-line 217, :hash "2081961259"} {:id "defn/emit-literal-test", :kind "defn", :line 219, :end-line 230, :hash "-1971300425"}]}
+;; {:version 1, :tested-at "2026-03-15T13:37:26.134421-05:00", :module-hash "88897210", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 2, :hash "-732582226"} {:id "defn/emit-construct", :kind "defn", :line 4, :end-line 18, :hash "881575364"} {:id "defn/emit-record-get", :kind "defn", :line 20, :end-line 29, :hash "1105717458"} {:id "defn/emit-java-get-field", :kind "defn", :line 31, :end-line 38, :hash "72788422"} {:id "defn/emit-java-static-get-field", :kind "defn", :line 40, :end-line 46, :hash "1885727713"} {:id "defn/emit-java-set-field", :kind "defn", :line 48, :end-line 56, :hash "-972448071"} {:id "defn/emit-java-static-set-field", :kind "defn", :line 58, :end-line 65, :hash "-198808029"} {:id "defn/emit-variant", :kind "defn", :line 67, :end-line 72, :hash "-1647134579"} {:id "defn/emit-map-empty", :kind "defn", :line 74, :end-line 83, :hash "-1855517679"} {:id "defn/emit-map-set", :kind "defn", :line 85, :end-line 132, :hash "1728533096"} {:id "defn/emit-map-get", :kind "defn", :line 134, :end-line 174, :hash "289727427"} {:id "defn/emit-map-contains", :kind "defn", :line 176, :end-line 185, :hash "-1455959828"} {:id "defn/emit-map-keys", :kind "defn", :line 187, :end-line 203, :hash "723777927"} {:id "defn/emit-instance-of", :kind "defn", :line 205, :end-line 208, :hash "1626769910"} {:id "defn/emit-variant-field", :kind "defn", :line 210, :end-line 220, :hash "2081961259"} {:id "defn/emit-literal-test", :kind "defn", :line 222, :end-line 233, :hash "-1971300425"}]}
 ;; clj-mutate-manifest-end

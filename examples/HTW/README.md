@@ -14,7 +14,7 @@ This example is a complete AIR-J console game with AIR-J unit tests. It is split
 
 The tests exercise:
 
-- command parsing and formatting helpers
+- command parsing through canonical `Option` and `Result` values
 - pure move and shot resolution
 - state transitions for pits, bats, misses, and wins
 - the console shell only as a thin wrapper around the pure logic
