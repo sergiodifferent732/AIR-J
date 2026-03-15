@@ -568,6 +568,44 @@
                                            1
                                            2]}}]})))
 
+  (it "accepts sequence construction primitives"
+    (let [module {:name 'example/seq-build
+                  :imports []
+                  :exports ['build]
+                  :decls [{:op :fn
+                           :name 'build
+                           :params []
+                           :return-type '(Seq String)
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq-append
+                                  :args [{:op :seq-append
+                                          :args [{:op :seq-empty
+                                                  :element-type 'String}
+                                                 "alpha"]}
+                                         "beta"]}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "rejects seq-append with a mismatched element type"
+    (should-throw clojure.lang.ExceptionInfo
+                  "Type mismatch."
+                  (sut/check-module
+                   {:name 'example/bad-seq-append
+                    :imports []
+                    :exports ['build]
+                    :decls [{:op :fn
+                             :name 'build
+                             :params []
+                             :return-type '(Seq String)
+                             :effects []
+                             :requires [true]
+                             :ensures [true]
+                             :body {:op :seq-append
+                                    :args [{:op :seq-empty
+                                            :element-type 'String}
+                                           1]}}]})))
+
   (it "rejects string-char-at with a non-int index"
     (should-throw clojure.lang.ExceptionInfo
                   "Type mismatch."

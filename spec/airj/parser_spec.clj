@@ -727,7 +727,31 @@
                               :args [{:op :seq-rest
                                       :arg {:op :local :name 'items}}
                                      {:op :string-split-on
-                                      :args ["z" ","]}]}}]}
+                                     :args ["z" ","]}]}}]}
+               (-> ast :decls first :body))))
+
+  (it "parses sequence construction primitives"
+    (let [source "(module example/seq-build
+                    (imports)
+                    (export build)
+                    (fn build
+                      (params)
+                      (returns (Seq String))
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (seq-append
+                        (seq-append
+                          (seq-empty String)
+                          \"alpha\")
+                        \"beta\")))"
+          ast (sut/parse-module source)]
+      (should= {:op :seq-append
+                :args [{:op :seq-append
+                        :args [{:op :seq-empty
+                                :element-type 'String}
+                               "alpha"]}
+                       "beta"]}
                (-> ast :decls first :body))))
 
   (it "rejects when as a non-canonical persisted form"

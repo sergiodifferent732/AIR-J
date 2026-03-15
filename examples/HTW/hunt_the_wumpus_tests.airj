@@ -1,0 +1,129 @@
+(module example/hunt_the_wumpus_tests
+  (imports
+    (airj airj/test TestOutcome
+                          TestSummary
+                          assert-bool-eq
+                          assert-string-eq)
+    (airj airj/test-runner exit-code
+                                 print-summary
+                                 summarize)
+    (airj example/wumpus_logic adjacent?
+                                any-bat-near?
+                                any-pit-near?
+                                command-arg
+                                command-verb
+                                neighbor-text
+                                valid-room?
+                                warning-near?))
+  (export parses-command-verb
+          parses-command-arg
+          recognizes-adjacent-room
+          rejects-invalid-room
+          reports-wumpus-warning
+          reports-bat-warning
+          formats-neighbor-text
+          main)
+
+  (fn parses-command-verb
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-string-eq)
+          "parses command verb"
+          (call (local command-verb) " move 10 ")
+          "move"))
+
+  (fn parses-command-arg
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-string-eq)
+          "parses command arg"
+          (call (local command-arg) "shoot 11")
+          "11"))
+
+  (fn recognizes-adjacent-room
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-bool-eq)
+          "recognizes adjacent room"
+          (call (local adjacent?) "1" "5")
+          true))
+
+  (fn rejects-invalid-room
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-bool-eq)
+          "rejects invalid room"
+          (call (local valid-room?) "21")
+          false))
+
+  (fn reports-wumpus-warning
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-bool-eq)
+          "reports wumpus warning"
+          (call (local warning-near?) "10" "11")
+          true))
+
+  (fn reports-bat-warning
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-bool-eq)
+          "reports bat warning"
+          (call (local any-bat-near?) "2")
+          true))
+
+  (fn formats-neighbor-text
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-string-eq)
+          "formats neighbor text"
+          (call (local neighbor-text) "1")
+          "Tunnels lead to 2, 5, 8"))
+
+  (fn main
+    (params (args StringSeq))
+    (returns Int)
+    (effects (Stdout.Write))
+    (requires true)
+    (ensures true)
+    (let ((summary
+            (call (local summarize)
+                  (seq-append
+                    (seq-append
+                      (seq-append
+                        (seq-append
+                          (seq-append
+                            (seq-append
+                              (seq-append
+                                (seq-empty TestOutcome)
+                                (call (local parses-command-verb)))
+                              (call (local parses-command-arg)))
+                            (call (local recognizes-adjacent-room)))
+                          (call (local rejects-invalid-room)))
+                        (call (local reports-wumpus-warning)))
+                      (call (local reports-bat-warning)))
+                    (call (local formats-neighbor-text))))))
+      (seq
+        (call (local print-summary) (local summary))
+        (call (local exit-code) (local summary))))))

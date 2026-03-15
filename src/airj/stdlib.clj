@@ -344,6 +344,145 @@
                   (string-concat \"expected=\" (local expected))
                   (string-concat \", actual=\" (local actual)))))))"
 
+   'airj/test-runner
+   "(module airj/test-runner
+      (imports
+        (airj airj/core Diagnostic)
+        (airj airj/test TestOutcome TestSummary))
+      (export empty-summary
+              record
+              summarize
+              failure-count
+              exit-code
+              render-outcome
+              render-summary
+              print-summary)
+      (fn empty-summary
+        (params)
+        (returns TestSummary)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (construct TestSummary
+                   0
+                   0
+                   0
+                   (seq-empty TestOutcome)))
+      (fn record
+        (params (summary TestSummary) (outcome TestOutcome))
+        (returns TestSummary)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (match (local outcome)
+          (case (Pass name)
+            (construct TestSummary
+                       (int-add (record-get (local summary) passed) 1)
+                       (record-get (local summary) failed)
+                       (record-get (local summary) errored)
+                       (seq-append (record-get (local summary) outcomes)
+                                   (local outcome))))
+          (case (Fail name diagnostic)
+            (construct TestSummary
+                       (record-get (local summary) passed)
+                       (int-add (record-get (local summary) failed) 1)
+                       (record-get (local summary) errored)
+                       (seq-append (record-get (local summary) outcomes)
+                                   (local outcome))))
+          (case (Error name diagnostic)
+            (construct TestSummary
+                       (record-get (local summary) passed)
+                       (record-get (local summary) failed)
+                       (int-add (record-get (local summary) errored) 1)
+                       (seq-append (record-get (local summary) outcomes)
+                                   (local outcome))))))
+      (fn summarize
+        (params (outcomes (Seq TestOutcome)))
+        (returns TestSummary)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (loop ((remaining (local outcomes))
+               (summary (call (local empty-summary))))
+          (if
+            (seq-empty? (local remaining))
+            (local summary)
+            (recur (seq-rest (local remaining))
+                   (call (local record)
+                         (local summary)
+                         (seq-first (local remaining)))))))
+      (fn failure-count
+        (params (summary TestSummary))
+        (returns Int)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (int-add
+          (record-get (local summary) failed)
+          (record-get (local summary) errored)))
+      (fn exit-code
+        (params (summary TestSummary))
+        (returns Int)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (if
+          (int-eq (call (local failure-count) (local summary)) 0)
+          0
+          1))
+      (fn render-outcome
+        (params (outcome TestOutcome))
+        (returns String)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (match (local outcome)
+          (case (Pass name)
+            (string-concat \"PASS \" (local name)))
+          (case (Fail name diagnostic)
+            (string-concat
+              (string-concat
+                (string-concat \"FAIL \" (local name))
+                \": \")
+              (record-get (local diagnostic) message)))
+          (case (Error name diagnostic)
+            (string-concat
+              (string-concat
+                (string-concat \"ERROR \" (local name))
+                \": \")
+              (record-get (local diagnostic) message)))))
+      (fn render-summary
+        (params (summary TestSummary))
+        (returns String)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (string-concat
+          (string-concat
+            (string-concat
+              (string-concat
+                (string-concat
+                  (string-concat \"Summary: \"
+                                 (int->string (record-get (local summary) passed)))
+                  \" passed, \")
+                (int->string (record-get (local summary) failed)))
+              \" failed, \")
+            (int->string (record-get (local summary) errored)))
+          \" errored\"))
+      (fn print-summary
+        (params (summary TestSummary))
+        (returns Unit)
+        (effects (Stdout.Write))
+        (requires true)
+        (ensures true)
+        (loop ((remaining (record-get (local summary) outcomes)))
+          (if
+            (seq-empty? (local remaining))
+            (io/println (call (local render-summary) (local summary)))
+            (seq
+              (io/println (call (local render-outcome) (seq-first (local remaining))))
+              (recur (seq-rest (local remaining))))))))"
+
    'airj/file
    "(module airj/file
       (imports
@@ -620,5 +759,5 @@
       seen)))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-15T11:53:09.657455-05:00", :module-hash "1223989292", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 581, :hash "603609246"} {:id "defn/source-map", :kind "defn", :line 583, :end-line 585, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 587, :end-line 589, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 591, :end-line 593, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 595, :end-line 597, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 599, :end-line 605, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 607, :end-line 620, :hash "-1038087388"}]}
+;; {:version 1, :tested-at "2026-03-15T12:20:50.469554-05:00", :module-hash "1218727272", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 720, :hash "-1544063846"} {:id "defn/source-map", :kind "defn", :line 722, :end-line 724, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 726, :end-line 728, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 730, :end-line 732, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 734, :end-line 736, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 738, :end-line 744, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 746, :end-line 759, :hash "-1038087388"}]}
 ;; clj-mutate-manifest-end

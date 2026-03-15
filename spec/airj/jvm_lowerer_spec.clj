@@ -855,6 +855,43 @@
                    first
                    :body))))
 
+  (it "lowers sequence construction primitives into JVM plan nodes"
+    (let [module {:name 'example/seq_build
+                  :imports []
+                  :exports ['build]
+                  :decls [{:op :fn
+                           :name 'build
+                           :params []
+                           :return-type '(Seq String)
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq-append
+                                  :args [{:op :seq-append
+                                          :args [{:op :seq-empty
+                                                  :element-type 'String}
+                                                 "alpha"]}
+                                         "beta"]}}]}]
+      (should= {:op :jvm-seq-append
+                :args [{:op :jvm-seq-append
+                        :args [{:op :jvm-seq-empty-new
+                                :element-jvm-type "java/lang/String"
+                                :jvm-type "java/util/List"}
+                               {:op :jvm-string
+                                :value "alpha"
+                                :jvm-type "java/lang/String"}]
+                        :element-jvm-type "java/lang/String"
+                        :jvm-type "java/util/List"}
+                       {:op :jvm-string
+                        :value "beta"
+                        :jvm-type "java/lang/String"}]
+                :element-jvm-type "java/lang/String"
+                :jvm-type "java/util/List"}
+               (-> (sut/lower-module module)
+                   :methods
+                   first
+                   :body))))
+
   (it "lowers imported function calls to the imported module owner"
     (let [module {:name 'example/imported
                   :imports [{:op :airj-import

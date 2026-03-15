@@ -1471,6 +1471,41 @@
       (should= true (.invoke double-key? nil (object-array [])))
       (should= 1 (.invoke key-count nil (object-array [])))))
 
+  (it "emits sequence construction primitives"
+    (let [plan {:op :jvm-module
+                :module-name 'example/seq_build
+                :internal-name "example/seq_build"
+                :exports ['size]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'size
+                           :owner "example/seq_build"
+                           :params []
+                           :return-type :int
+                           :effects []
+                           :body {:op :jvm-seq-length
+                                  :arg {:op :jvm-seq-append
+                                        :args [{:op :jvm-seq-append
+                                                :args [{:op :jvm-seq-empty-new
+                                                        :element-jvm-type "java/lang/String"
+                                                        :jvm-type "java/util/List"}
+                                                       {:op :jvm-string
+                                                        :value "alpha"
+                                                        :jvm-type "java/lang/String"}]
+                                                :element-jvm-type "java/lang/String"
+                                                :jvm-type "java/util/List"}
+                                               {:op :jvm-string
+                                                :value "beta"
+                                                :jvm-type "java/lang/String"}]
+                                        :element-jvm-type "java/lang/String"
+                                        :jvm-type "java/util/List"}
+                                  :jvm-type :int}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.seq_build" bytes)
+          size (.getMethod klass "size" (into-array Class []))]
+      (should= 2 (.invoke size nil (object-array [])))))
+
   (it "emits literal tests"
     (let [plan {:op :jvm-module
                 :module-name 'example/literal_test
