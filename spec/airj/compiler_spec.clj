@@ -1347,6 +1347,90 @@
           (should= "Postcondition failed: main"
                    (.getMessage (.getCause e)))))))
 
+  (it "evaluates arithmetic preconditions and postconditions at runtime"
+    (let [source "(module example/arithmetic_contracts
+                    (imports)
+                    (export add-safe main)
+                    (fn add-safe
+                      (params (x Int) (y Int))
+                      (returns Int)
+                      (effects ())
+                      (requires
+                        (bool-and
+                          (int-ge (local x) 0)
+                          (int-ge (local y) 0)))
+                      (ensures
+                        (int-eq (local __airj_result)
+                                (int-add (local x) (local y))))
+                      (int-add (local x) (local y)))
+                    (fn main
+                      (params)
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (call (local add-safe) 2 3)))"]
+      (should= 5 (sut/run-source! source []))))
+
+  (it "rejects failing arithmetic preconditions at runtime"
+    (let [source "(module example/arithmetic_preconditions
+                    (imports)
+                    (export add-safe main)
+                    (fn add-safe
+                      (params (x Int) (y Int))
+                      (returns Int)
+                      (effects ())
+                      (requires
+                        (bool-and
+                          (int-ge (local x) 0)
+                          (int-ge (local y) 0)))
+                      (ensures
+                        (int-eq (local __airj_result)
+                                (int-add (local x) (local y))))
+                      (int-add (local x) (local y)))
+                    (fn main
+                      (params)
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (call (local add-safe) -1 3)) )"]
+      (try
+        (sut/run-source! source [])
+        (should false)
+        (catch java.lang.reflect.InvocationTargetException e
+          (should (instance? IllegalStateException (.getCause e)))
+          (should= "Precondition failed: add-safe"
+                   (.getMessage (.getCause e)))))))
+
+  (it "rejects failing arithmetic postconditions at runtime"
+    (let [source "(module example/arithmetic_postconditions
+                    (imports)
+                    (export add-bad main)
+                    (fn add-bad
+                      (params (x Int) (y Int))
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures
+                        (int-eq (local __airj_result)
+                                (int-add (local x) (local y))))
+                      (int-sub (local x) (local y)))
+                    (fn main
+                      (params)
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (call (local add-bad) 5 3)))"]
+      (try
+        (sut/run-source! source [])
+        (should false)
+        (catch java.lang.reflect.InvocationTargetException e
+          (should (instance? IllegalStateException (.getCause e)))
+          (should= "Postcondition failed: add-bad"
+                   (.getMessage (.getCause e)))))))
+
   (it "enforces failing data invariants at runtime when constructing values"
     (let [source "(module example/data_invariants
                     (imports)

@@ -18,15 +18,49 @@
       (should= {:name 'example/minimal
                 :imports []
                 :exports []
-                :decls [{:op :fn
-                         :name 'identity
-                         :params [{:name 'x :type 'Int}]
-                         :return-type 'Int
-                         :effects []
-                         :requires [true]
-                         :ensures [true]
-                         :body {:op :local :name 'x}}]}
+               :decls [{:op :fn
+                        :name 'identity
+                        :params [{:name 'x :type 'Int}]
+                        :return-type 'Int
+                        :effects []
+                        :requires [true]
+                        :ensures [true]
+                        :body {:op :local :name 'x}}]}
                ast)))
+
+  (it "parses arithmetic contract expressions into AIR-J expr trees"
+    (let [source "(module example/contracts
+                    (imports)
+                    (export fill)
+                    (fn fill
+                      (params (level Int) (amount Int))
+                      (returns Int)
+                      (effects ())
+                      (requires
+                        (bool-and
+                          (int-ge (local amount) 0)
+                          (int-le (int-add (local level) (local amount)) 10)))
+                      (ensures
+                        (int-eq (local __airj_result)
+                                (int-add (local level) (local amount))))
+                      (int-add (local level) (local amount))))"
+          ast (sut/parse-module source)]
+      (should= [{:op :bool-and
+                 :args [{:op :int-ge
+                         :args [{:op :local :name 'amount}
+                                0]}
+                        {:op :int-le
+                         :args [{:op :int-add
+                                 :args [{:op :local :name 'level}
+                                        {:op :local :name 'amount}]}
+                                10]}]}]
+               (-> ast :decls first :requires))
+      (should= [{:op :int-eq
+                 :args [{:op :local :name '__airj_result}
+                        {:op :int-add
+                         :args [{:op :local :name 'level}
+                                {:op :local :name 'amount}]}]}]
+               (-> ast :decls first :ensures))))
 
   (it "parses a host-backed AIR-J module"
     (let [source "(module example/hosted

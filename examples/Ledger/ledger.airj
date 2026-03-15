@@ -10,6 +10,8 @@
           total-balance)
 
   (data Account
+    (invariants
+      (int-ge (local balance) 0))
     (field id String)
     (field balance Int))
 
@@ -21,16 +23,18 @@
     (params (id String))
     (returns Account)
     (effects ())
-    (requires true)
-    (ensures true)
+    (requires (bool-not (string-empty? (local id))))
+    (ensures (int-eq (record-get (local __airj_result) balance) 0))
     (construct Account (local id) 0))
 
   (fn deposit
     (params (account Account) (amount Int))
     (returns Account)
     (effects ())
-    (requires true)
-    (ensures true)
+    (requires (int-ge (local amount) 1))
+    (ensures (int-eq
+               (record-get (local __airj_result) balance)
+               (int-add (record-get (local account) balance) (local amount))))
     (construct Account
                (record-get (local account) id)
                (int-add (record-get (local account) balance) (local amount))))
@@ -39,8 +43,14 @@
     (params (account Account) (amount Int))
     (returns Account)
     (effects ())
-    (requires true)
-    (ensures true)
+    (requires (bool-and
+                (int-ge (local amount) 1)
+                (int-ge
+                  (record-get (local account) balance)
+                  (local amount))))
+    (ensures (int-eq
+               (record-get (local __airj_result) balance)
+               (int-sub (record-get (local account) balance) (local amount))))
     (construct Account
                (record-get (local account) id)
                (int-sub (record-get (local account) balance) (local amount))))
@@ -49,8 +59,18 @@
     (params (from Account) (to Account) (amount Int))
     (returns Transfer)
     (effects ())
-    (requires true)
-    (ensures true)
+    (requires (bool-and
+                (int-ge (local amount) 1)
+                (int-ge
+                  (record-get (local from) balance)
+                  (local amount))))
+    (ensures (int-eq
+               (call (local total-balance)
+                     (record-get (local __airj_result) from)
+                     (record-get (local __airj_result) to))
+               (call (local total-balance)
+                     (local from)
+                     (local to))))
     (construct Transfer
                (call (local withdraw) (local from) (local amount))
                (call (local deposit) (local to) (local amount))))

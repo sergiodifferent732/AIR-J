@@ -1325,6 +1325,37 @@
           method (.getMethod klass "compute" (into-array Class [Integer/TYPE]))]
       (should= 5 (.invoke method nil (object-array [(int 5)])))))
 
+  (it "emits let bindings with lexical shadowing"
+    (let [plan {:op :jvm-module
+                :module-name 'example/let_shadow
+                :internal-name "example/let_shadow"
+                :exports ['capture]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'capture
+                           :owner "example/let_shadow"
+                           :params [{:name 'id :jvm-type "java/lang/String"}]
+                           :return-type "java/lang/String"
+                           :effects []
+                           :body {:op :jvm-let
+                                  :bindings [{:name '__airj_temp
+                                              :expr {:op :jvm-local
+                                                     :name 'id
+                                                     :jvm-type "java/lang/String"}}
+                                             {:name 'id
+                                              :expr {:op :jvm-local
+                                                     :name '__airj_temp
+                                                     :jvm-type "java/lang/String"}}]
+                                  :body {:op :jvm-local
+                                         :name 'id
+                                         :jvm-type "java/lang/String"}
+                                  :jvm-type "java/lang/String"}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.let_shadow" bytes)
+          method (.getMethod klass "capture" (into-array Class [String]))]
+      (should= "kept" (.invoke method nil (object-array ["kept"])))))
+
   (it "emits mutable locals in module methods"
     (let [plan {:op :jvm-module
                 :module-name 'example/state

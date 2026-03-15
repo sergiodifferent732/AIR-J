@@ -200,6 +200,13 @@ Example:
 
 These are checked statically for type/effect discipline and enforced at runtime where the implementation supports them.
 
+Current implementation support:
+- `requires`, `ensures`, and `invariants` are parsed as ordinary AIR-J expressions
+- contract expressions may use the same pure boolean/int/string expression forms used in ordinary function bodies
+- `ensures` clauses may reference `__airj_result` as the function result value
+- `requires` clauses may reference parameters and imported pure functions
+- `invariants` may reference the declaration contract scope described in the formal spec
+
 ## Expressions
 
 Important canonical expression forms:

@@ -1,16 +1,18 @@
 # AIR-J Ledger
 
-This example is a bounded AIR-J domain model built around a bank-style ledger.
+This example is a contract-heavy AIR-J domain model built around a bounded
+bank-style ledger.
 
 It demonstrates:
 
-- pure logic organized so stronger contracts can be added later
-- AIR-J tests that prove balance-preservation and transfer behavior today
+- record invariants on account state
+- preconditions on deposits, withdrawals, and transfers
+- postconditions that preserve exact balance changes
 - AIR-J tests through explicit text and JSON test roots
 
 ## Files
 
-- `ledger.airj`: bounded account and transfer logic
+- `ledger.airj`: contract-heavy account and transfer logic
 - `ledger_test_suite.airj`: reusable AIR-J test suite
 - `ledger_tests_root.airj`: canonical text test root
 - `ledger_tests_json.airj`: canonical JSON test root
@@ -39,17 +41,10 @@ clj -M -m airj.cli build --project-dir examples/Ledger --jar /tmp/ledger-tests-j
 java -jar /tmp/ledger-tests-json.jar
 ```
 
-The suite focuses on the domain rules that a fuller contract system should
-eventually express directly:
+The suite focuses on contract-preserving success paths:
 
 - opening a valid account at zero
 - positive deposits and bounded withdrawals
 - transfer preserving total funds
 - transfer updating both accounts exactly
 - stable balance labels for reporting
-
-Current AIR-J note:
-
-- richer arithmetic `requires`/`ensures` clauses for this example are not yet
-  accepted by the implementation, so those rules are enforced here by AIR-J
-  tests rather than by compiled contracts

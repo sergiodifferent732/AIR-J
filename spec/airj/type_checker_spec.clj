@@ -156,6 +156,22 @@
                              :ensures [true]
                              :body 1}]})))
 
+  (it "accepts ensures clauses that reference __airj_result"
+    (let [module {:name 'example/postcondition-result
+                  :imports []
+                  :exports ['f]
+                  :decls [{:op :fn
+                           :name 'f
+                           :params [{:name 'x :type 'Int}]
+                           :return-type 'Int
+                           :effects []
+                           :requires [true]
+                           :ensures [{:op :int-eq
+                                      :args [{:op :local :name '__airj_result}
+                                             {:op :local :name 'x}]}]
+                           :body {:op :local :name 'x}}]}]
+      (should= module (sut/check-module module))))
+
   (it "rejects non-boolean data invariants"
     (should-throw clojure.lang.ExceptionInfo
                   "Expected Bool."
