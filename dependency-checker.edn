@@ -35,7 +35,8 @@
                         :project-sources [:interface-sources :normalizer :parser :project-graph :stdlib]
                         :stdlib [:interface-sources :parser]
                         :type-checker [:imported-interfaces :java-types :patterns]
-                        :parser []}
+                        :parser []
+                        :text-runtime []}
  :ignored-components [:spec]
  :fail-on-cycles true
  :fail-on-violations true}

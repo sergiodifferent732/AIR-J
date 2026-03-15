@@ -44,8 +44,9 @@
 
 (defn- build-command
   [source output-dir options]
-  (-> source
-      (compiler/build-source! output-dir options)
+  (-> (if-let [jar-output (:jar-output options)]
+        (compiler/build-source-jar! source jar-output options)
+        (compiler/build-source! source output-dir options))
       pr-str))
 
 (defn- run-command
@@ -84,25 +85,31 @@
 
 (defn- parse-options
   [args]
-  (cond
-    (= "--interfaces-edn" (first args))
-    [{:interfaces (read-interfaces (second args))}
-     (nnext args)]
+  (loop [options {}
+         remaining args]
+    (cond
+      (= "--interfaces-edn" (first remaining))
+      (recur (assoc options :interfaces (read-interfaces (second remaining)))
+             (nnext remaining))
 
-    (= "--interface-sources-edn" (first args))
-    [{:interface-sources (read-interface-sources (second args))}
-     (nnext args)]
+      (= "--interface-sources-edn" (first remaining))
+      (recur (assoc options :interface-sources (read-interface-sources (second remaining)))
+             (nnext remaining))
 
-    (= "--project-sources-edn" (first args))
-    [{:project-sources (read-project-sources (second args))}
-     (nnext args)]
+      (= "--project-sources-edn" (first remaining))
+      (recur (assoc options :project-sources (read-project-sources (second remaining)))
+             (nnext remaining))
 
-    (= "--project-dir" (first args))
-    [{:project-dir (read-project-dir (second args))}
-     (nnext args)]
+      (= "--project-dir" (first remaining))
+      (recur (assoc options :project-dir (read-project-dir (second remaining)))
+             (nnext remaining))
 
-    :else
-    [{} args]))
+      (= "--jar" (first remaining))
+      (recur (assoc options :jar-output (second remaining))
+             (nnext remaining))
+
+      :else
+      [options remaining])))
 
 (def ^:private source-commands
   {"parse" (fn [source _] (parse-command source))
@@ -251,6 +258,10 @@
   (let [[command & command-args] args]
     (command-result command command-args stdin)))
 
+(defn- stdin-required?
+  [args]
+  (some #{"--stdin"} args))
+
 (defn- diagnostic-data
   [error]
   (let [data (ex-data error)
@@ -275,11 +286,11 @@
 (defn -main
   [& args]
   (try
-    (println (run args (slurp *in*)))
+    (println (run args (if (stdin-required? args) (slurp *in*) "")))
     0
     (catch clojure.lang.ExceptionInfo e
       (handle-cli-exception e))))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-13T14:54:58.989243-05:00", :module-hash "-391652923", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 11, :hash "1645197149"} {:id "defn-/parse-command", :kind "defn-", :line 13, :end-line 15, :hash "1121072814"} {:id "defn-/normalize-command", :kind "defn-", :line 17, :end-line 22, :hash "1007829560"} {:id "defn-/check-command", :kind "defn-", :line 24, :end-line 29, :hash "1273151433"} {:id "defn-/lower-command", :kind "defn-", :line 31, :end-line 37, :hash "2093538237"} {:id "defn-/interface-command", :kind "defn-", :line 39, :end-line 43, :hash "-347479495"} {:id "defn-/build-command", :kind "defn-", :line 45, :end-line 49, :hash "607607015"} {:id "defn-/run-command", :kind "defn-", :line 51, :end-line 55, :hash "1684929123"} {:id "defn-/read-source", :kind "defn-", :line 57, :end-line 61, :hash "-1955156800"} {:id "defn-/read-interfaces", :kind "defn-", :line 63, :end-line 67, :hash "-125656322"} {:id "defn-/read-interface-sources", :kind "defn-", :line 69, :end-line 73, :hash "-19164240"} {:id "defn-/read-project-sources", :kind "defn-", :line 75, :end-line 79, :hash "-1257545745"} {:id "defn-/read-project-dir", :kind "defn-", :line 81, :end-line 83, :hash "1367042759"} {:id "defn-/parse-options", :kind "defn-", :line 85, :end-line 105, :hash "1505099938"} {:id "def/source-commands", :kind "def", :line 107, :end-line 112, :hash "1484354291"} {:id "def/project-commands", :kind "def", :line 114, :end-line 132, :hash "1813700741"} {:id "def/project-dir-commands", :kind "def", :line 134, :end-line 150, :hash "-1565116535"} {:id "defn-/source-command-result", :kind "defn-", :line 152, :end-line 158, :hash "2021591110"} {:id "defn-/project-command-result", :kind "defn-", :line 160, :end-line 166, :hash "-1140893930"} {:id "defn-/project-command-args", :kind "defn-", :line 168, :end-line 173, :hash "1835019243"} {:id "defn-/project-root-module", :kind "defn-", :line 175, :end-line 177, :hash "1262629310"} {:id "defn-/with-project-context", :kind "defn-", :line 179, :end-line 189, :hash "-115430676"} {:id "defn-/project-result", :kind "defn-", :line 191, :end-line 199, :hash "-662015587"} {:id "defn-/project-dir-result", :kind "defn-", :line 201, :end-line 212, :hash "763986541"} {:id "defn-/source-result", :kind "defn-", :line 214, :end-line 226, :hash "253873564"} {:id "defn-/command-result", :kind "defn-", :line 228, :end-line 247, :hash "-1586741967"} {:id "defn/run", :kind "defn", :line 249, :end-line 252, :hash "-360055027"} {:id "defn-/diagnostic-data", :kind "defn-", :line 254, :end-line 263, :hash "-121100729"} {:id "defn-/format-cli-error", :kind "defn-", :line 265, :end-line 267, :hash "1099909786"} {:id "defn-/handle-cli-exception", :kind "defn-", :line 269, :end-line 273, :hash "2060159512"} {:id "defn/-main", :kind "defn", :line 275, :end-line 281, :hash "856405844"}]}
+;; {:version 1, :tested-at "2026-03-15T10:27:00.467678-05:00", :module-hash "2009186106", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 11, :hash "1645197149"} {:id "defn-/parse-command", :kind "defn-", :line 13, :end-line 15, :hash "1121072814"} {:id "defn-/normalize-command", :kind "defn-", :line 17, :end-line 22, :hash "1007829560"} {:id "defn-/check-command", :kind "defn-", :line 24, :end-line 29, :hash "1273151433"} {:id "defn-/lower-command", :kind "defn-", :line 31, :end-line 37, :hash "2093538237"} {:id "defn-/interface-command", :kind "defn-", :line 39, :end-line 43, :hash "-347479495"} {:id "defn-/build-command", :kind "defn-", :line 45, :end-line 50, :hash "599793461"} {:id "defn-/run-command", :kind "defn-", :line 52, :end-line 56, :hash "1684929123"} {:id "defn-/read-source", :kind "defn-", :line 58, :end-line 62, :hash "-1955156800"} {:id "defn-/read-interfaces", :kind "defn-", :line 64, :end-line 68, :hash "-125656322"} {:id "defn-/read-interface-sources", :kind "defn-", :line 70, :end-line 74, :hash "-19164240"} {:id "defn-/read-project-sources", :kind "defn-", :line 76, :end-line 80, :hash "-1257545745"} {:id "defn-/read-project-dir", :kind "defn-", :line 82, :end-line 84, :hash "1367042759"} {:id "defn-/parse-options", :kind "defn-", :line 86, :end-line 112, :hash "19057762"} {:id "def/source-commands", :kind "def", :line 114, :end-line 119, :hash "1484354291"} {:id "def/project-commands", :kind "def", :line 121, :end-line 139, :hash "1813700741"} {:id "def/project-dir-commands", :kind "def", :line 141, :end-line 157, :hash "-1565116535"} {:id "defn-/source-command-result", :kind "defn-", :line 159, :end-line 165, :hash "2021591110"} {:id "defn-/project-command-result", :kind "defn-", :line 167, :end-line 173, :hash "-1140893930"} {:id "defn-/project-command-args", :kind "defn-", :line 175, :end-line 180, :hash "1835019243"} {:id "defn-/project-root-module", :kind "defn-", :line 182, :end-line 184, :hash "1262629310"} {:id "defn-/with-project-context", :kind "defn-", :line 186, :end-line 196, :hash "-115430676"} {:id "defn-/project-result", :kind "defn-", :line 198, :end-line 206, :hash "-662015587"} {:id "defn-/project-dir-result", :kind "defn-", :line 208, :end-line 219, :hash "763986541"} {:id "defn-/source-result", :kind "defn-", :line 221, :end-line 233, :hash "253873564"} {:id "defn-/command-result", :kind "defn-", :line 235, :end-line 254, :hash "-1586741967"} {:id "defn/run", :kind "defn", :line 256, :end-line 259, :hash "-360055027"} {:id "defn-/stdin-required?", :kind "defn-", :line 261, :end-line 263, :hash "1700238319"} {:id "defn-/diagnostic-data", :kind "defn-", :line 265, :end-line 274, :hash "-121100729"} {:id "defn-/format-cli-error", :kind "defn-", :line 276, :end-line 278, :hash "1099909786"} {:id "defn-/handle-cli-exception", :kind "defn-", :line 280, :end-line 284, :hash "2060159512"} {:id "defn/-main", :kind "defn", :line 286, :end-line 292, :hash "-1422999948"}]}
 ;; clj-mutate-manifest-end

@@ -1,5 +1,6 @@
 (ns airj.compiler-spec
   (:require [airj.compiler :as sut]
+            [airj.text-runtime :as text-runtime]
             [clojure.java.io :as io]
             [speclj.core :refer :all]))
 
@@ -51,6 +52,20 @@
                                      (concat [(java-command) "-cp" classpath class-name]
                                              args))))]
     (.waitFor process)))
+
+(defn- run-jar-process
+  [jar-path input & args]
+  (let [process (.start (ProcessBuilder.
+                         (into-array String
+                                     (concat [(java-command) "-jar" jar-path]
+                                             args))))
+        stdout (future (slurp (.getInputStream process)))
+        stderr (future (slurp (.getErrorStream process)))]
+    (with-open [stdin (.getOutputStream process)]
+      (.write stdin (.getBytes ^String input "UTF-8")))
+    {:exit (.waitFor process)
+     :out @stdout
+     :err @stderr}))
 
 (describe "compiler"
   (it "compiles AIR-J source into executable module class bytes"
@@ -288,9 +303,42 @@
       (try
         (java.lang.System/setOut out-stream)
         (java.lang.System/setIn (java.io.ByteArrayInputStream. (.getBytes "abc\n" "UTF-8")))
+        (text-runtime/reset-stdin!)
         (should= 9 (.invoke method nil (object-array [])))
         (should= ">abc" (.toString out-bytes "UTF-8"))
         (finally
+          (text-runtime/reset-stdin!)
+          (java.lang.System/setOut original-out)
+          (java.lang.System/setIn original-in)))))
+
+  (it "compiles AIR-J source with repeated stdin reads"
+    (let [source "(module example/repeated-text-io
+                    (imports)
+                    (export program)
+                    (fn program
+                      (params)
+                      (returns Int)
+                      (effects (Foreign.Throw Stdin.Read Stdout.Write))
+                      (requires true)
+                      (ensures true)
+                      (seq
+                        (io/print (string-concat \">\" (io/read-line)))
+                        (string-length (io/read-line)))))"
+          bundle (sut/compile-source source)
+          klass (define-class "example.repeated-text-io" (get bundle "example/repeated-text-io"))
+          method (.getMethod klass "program" (into-array Class []))
+          out-bytes (java.io.ByteArrayOutputStream.)
+          out-stream (java.io.PrintStream. out-bytes true "UTF-8")
+          original-out (java.lang.System/out)
+          original-in (java.lang.System/in)]
+      (try
+        (java.lang.System/setOut out-stream)
+        (java.lang.System/setIn (java.io.ByteArrayInputStream. (.getBytes "alpha\nbeta\n" "UTF-8")))
+        (text-runtime/reset-stdin!)
+        (should= 4 (.invoke method nil (object-array [])))
+        (should= ">alpha" (.toString out-bytes "UTF-8"))
+        (finally
+          (text-runtime/reset-stdin!)
           (java.lang.System/setOut original-out)
           (java.lang.System/setIn original-in)))))
 
@@ -360,6 +408,29 @@
       (should= (.getPath class-file) (get written "example/write"))
       (should (.exists class-file))
       (should (< 0 (.length class-file)))))
+
+  (it "writes executable jars with bundled runtime support"
+    (let [source "(module example/jar-run
+                    (imports)
+                    (export main)
+                    (fn main
+                      (params)
+                      (returns Int)
+                      (effects (Foreign.Throw Stdin.Read Stdout.Write))
+                      (requires true)
+                      (ensures true)
+                      (seq
+                        (io/print (string-concat \">\" (io/read-line)))
+                        (string-length (io/read-line)))))"
+          jar-path (.toString (java.nio.file.Files/createTempFile "airj-run" ".jar"
+                                                                  (make-array java.nio.file.attribute.FileAttribute 0)))
+          written (sut/build-source-jar! source jar-path)
+          run-result (run-jar-process jar-path "alpha\nbeta\n")]
+      (should= {:jar jar-path} written)
+      (should (.exists (io/file jar-path)))
+      (should= 4 (:exit run-result))
+      (should= ">alpha" (:out run-result))
+      (should= "" (:err run-result))))
 
   (it "loads emitted class files from disk and executes them"
     (let [source "(module example/on-disk

@@ -1,5 +1,6 @@
 (ns airj.jvm-emitter-spec
   (:require [airj.jvm-emitter :as sut]
+            [airj.text-runtime :as text-runtime]
             [clojure.java.io :as io]
             [speclj.core :refer :all])
   (:import (clojure.asm MethodVisitor Opcodes)))
@@ -772,9 +773,56 @@
       (try
         (java.lang.System/setOut (java.io.PrintStream. out-bytes true "UTF-8"))
         (java.lang.System/setIn (java.io.ByteArrayInputStream. (.getBytes "abc\n" "UTF-8")))
+        (text-runtime/reset-stdin!)
         (should= 9 (.invoke method nil (object-array [])))
         (should= ">abc" (.toString out-bytes "UTF-8"))
         (finally
+          (text-runtime/reset-stdin!)
+          (java.lang.System/setOut original-out)
+          (java.lang.System/setIn original-in)))))
+
+  (it "emits repeated stdin reads through the shared AIR-J text runtime"
+    (let [plan {:op :jvm-module
+                :module-name 'example/repeated_text_io
+                :internal-name "example/repeated_text_io"
+                :exports ['program]
+                :records []
+                :enums []
+                :unions []
+                :methods [{:name 'program
+                           :owner "example/repeated_text_io"
+                           :params []
+                           :return-type :int
+                           :effects ['Foreign.Throw 'Stdin.Read 'Stdout.Write]
+                           :body {:op :jvm-seq
+                                  :exprs [{:op :jvm-io-print
+                                           :arg {:op :jvm-string-concat
+                                                 :args [{:op :jvm-string
+                                                         :value ">"
+                                                         :jvm-type "java/lang/String"}
+                                                        {:op :jvm-io-read-line
+                                                         :jvm-type "java/lang/String"}]
+                                                 :jvm-type "java/lang/String"}
+                                           :jvm-type :void}
+                                          {:op :jvm-string-length
+                                           :arg {:op :jvm-io-read-line
+                                                 :jvm-type "java/lang/String"}
+                                           :jvm-type :int}]
+                                  :jvm-type :int}}]}
+          bytes (sut/emit-module-bytes plan)
+          klass (define-class "example.repeated_text_io" bytes)
+          method (.getMethod klass "program" (into-array Class []))
+          out-bytes (java.io.ByteArrayOutputStream.)
+          original-out (java.lang.System/out)
+          original-in (java.lang.System/in)]
+      (try
+        (java.lang.System/setOut (java.io.PrintStream. out-bytes true "UTF-8"))
+        (java.lang.System/setIn (java.io.ByteArrayInputStream. (.getBytes "alpha\nbeta\n" "UTF-8")))
+        (text-runtime/reset-stdin!)
+        (should= 4 (.invoke method nil (object-array [])))
+        (should= ">alpha" (.toString out-bytes "UTF-8"))
+        (finally
+          (text-runtime/reset-stdin!)
           (java.lang.System/setOut original-out)
           (java.lang.System/setIn original-in)))))
 

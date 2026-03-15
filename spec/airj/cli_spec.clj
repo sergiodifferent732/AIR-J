@@ -34,6 +34,11 @@
       (should-contain ":name example/from-file" result)
       (.delete file)))
 
+  (it "only requires stdin when explicitly requested"
+    (let [stdin-required? (ns-resolve 'airj.cli 'stdin-required?)]
+      (should-not (stdin-required? ["run" "example.airj"]))
+      (should (stdin-required? ["run" "--stdin"]))))
+
   (it "rejects unsupported commands"
     (should-throw clojure.lang.ExceptionInfo
                   "Unsupported command."
@@ -657,6 +662,24 @@
       (should-contain "\"example/build\"" result)
       (should-contain ".class" result)
       (should-contain output-dir result)))
+
+  (it "renders runnable jar output for the build command"
+    (let [source "(module example/build-jar
+                    (imports)
+                    (export main)
+                    (fn main
+                      (params)
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      0))"
+          jar-path (.toString (java.nio.file.Files/createTempFile "airj-cli-build" ".jar"
+                                                                  (make-array java.nio.file.attribute.FileAttribute 0)))
+          result (sut/run ["build" "--jar" jar-path "--stdin"] source)]
+      (should-contain ":jar" result)
+      (should-contain jar-path result)
+      (should (.exists (java.io.File. jar-path)))))
 
   (it "runs exported AIR-J main through the CLI"
     (let [property-name "airj.cli-spec.main"
