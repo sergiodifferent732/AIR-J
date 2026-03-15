@@ -494,6 +494,11 @@ The canonical bootstrap result artifact is:
 - `errored : Int`
 - `outcomes : (Seq ...)`
 
+Test-result policy:
+- `Fail` means the test executed normally and an assertion did not hold
+- `Error` means execution escaped the normal assertion path, such as an uncaught runtime exception or suite-level execution failure
+- uncaught suite execution is reported canonically as one `Error` outcome named `tests`
+
 ## Failure Model
 
 AIR-J uses two distinct boundary styles:

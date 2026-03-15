@@ -111,6 +111,7 @@ The canonical AIR-J test shape is:
   - `outcomes`
 
 See [`examples/HTW/README.md`](/Users/unclebob/projects/AIR-J/examples/HTW/README.md) for a complete AIR-J-native test jar example.
+See [`examples/ToolWorkflow/README.md`](/Users/unclebob/projects/AIR-J/examples/ToolWorkflow/README.md) for a non-game example that emits and then consumes the canonical JSON test artifact.
 
 ## Development Workflow
 

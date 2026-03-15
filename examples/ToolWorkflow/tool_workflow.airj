@@ -1,0 +1,60 @@
+(module example/tool_workflow
+  (imports
+    (airj airj/bytes utf8-decode utf8-encode)
+    (airj airj/file read-string-result write-string-result)
+    (airj airj/json parse-result write-result)
+    (airj airj/process run-result)
+    (airj example/tool_logic process-payload))
+  (export main)
+
+  (fn main
+    (params (args StringSeq))
+    (returns Int)
+    (effects (File.Read File.Write Foreign.Throw Process.Run Stdout.Write))
+    (requires (int-ge (seq-length (local args)) 2))
+    (ensures true)
+    (match (call (local read-string-result) (seq-get (local args) 0))
+      (case (Ok text)
+        (match (call (local run-result)
+                     (string-split-on "/bin/cat" "\u0000")
+                     (call (local utf8-encode) (local text)))
+          (case (Ok process)
+            (match (call (local parse-result)
+                         (call (local utf8-decode)
+                               (record-get (local process) stdout)))
+              (case (Ok payload)
+                (match (call (local process-payload) (local payload))
+                  (case (Ok transformed)
+                    (match (call (local write-result) (local transformed))
+                      (case (Ok json)
+                        (match (call (local write-string-result)
+                                     (seq-get (local args) 1)
+                                     (local json))
+                          (case (Ok written)
+                            (seq
+                              (io/println "ok")
+                              0))
+                          (case (Err diagnostic)
+                            (seq
+                              (io/println (record-get (local diagnostic) message))
+                              1))))
+                      (case (Err diagnostic)
+                        (seq
+                          (io/println (record-get (local diagnostic) message))
+                          1))))
+                  (case (Err diagnostic)
+                    (seq
+                      (io/println (record-get (local diagnostic) message))
+                      1))))
+              (case (Err diagnostic)
+                (seq
+                  (io/println (record-get (local diagnostic) message))
+                  1))))
+          (case (Err diagnostic)
+            (seq
+              (io/println (record-get (local diagnostic) message))
+              1))))
+      (case (Err diagnostic)
+        (seq
+          (io/println (record-get (local diagnostic) message))
+          1)))))

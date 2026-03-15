@@ -1,0 +1,141 @@
+(module example/tool_logic
+  (imports
+    (airj airj/core Diagnostic Interchange Result Option))
+  (export tool-field
+          tool-name-result
+          status-result
+          checked-name
+          checked-payload
+          process-payload)
+
+  (fn tool-field
+    (params (payload Interchange))
+    (returns (Result Interchange Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (local payload)
+      (case (MapValue entries)
+        (match (map-get (local entries) "tool")
+          (case (Some field)
+            (variant (Result Interchange Diagnostic) Ok (local field)))
+          (case (None)
+            (variant (Result Interchange Diagnostic)
+                     Err
+                     (construct Diagnostic
+                                "workflow"
+                                "Missing tool field."
+                                "tool")))))
+      (case _
+        (variant (Result Interchange Diagnostic)
+                 Err
+                 (construct Diagnostic
+                            "workflow"
+                            "Expected object payload."
+                            "tool")))))
+
+  (fn tool-name-result
+    (params (payload Interchange))
+    (returns (Result String Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local tool-field) (local payload))
+      (case (Ok field)
+        (match (local field)
+          (case (StringValue value)
+            (variant (Result String Diagnostic)
+                     Ok
+                     (string-trim (local value))))
+          (case _
+            (variant (Result String Diagnostic)
+                     Err
+                     (construct Diagnostic
+                                "workflow"
+                                "Expected string tool field."
+                                "tool")))))
+      (case (Err diagnostic)
+        (variant (Result String Diagnostic)
+                 Err
+                 (local diagnostic)))))
+
+  (fn status-result
+    (params (payload Interchange))
+    (returns (Result String Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (local payload)
+      (case (MapValue entries)
+        (match (map-get (local entries) "status")
+          (case (Some field)
+            (match (local field)
+              (case (StringValue value)
+                (variant (Result String Diagnostic)
+                         Ok
+                         (local value)))
+              (case _
+                (variant (Result String Diagnostic)
+                         Err
+                         (construct Diagnostic
+                                    "workflow"
+                                    "Expected string status field."
+                                    "status")))))
+          (case (None)
+            (variant (Result String Diagnostic)
+                     Err
+                     (construct Diagnostic
+                                "workflow"
+                                "Missing status field."
+                                "status")))))
+      (case _
+        (variant (Result String Diagnostic)
+                 Err
+                 (construct Diagnostic
+                            "workflow"
+                            "Expected object payload."
+                            "status")))))
+
+  (fn checked-name
+    (params (name String))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (string-concat
+      (string-trim (local name))
+      "-checked"))
+
+  (fn checked-payload
+    (params (name String))
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (variant Interchange
+             MapValue
+             (map-set
+               (map-set
+                 (map-empty Interchange)
+                 "tool"
+                 (variant Interchange
+                          StringValue
+                          (call (local checked-name) (local name))))
+               "status"
+               (variant Interchange StringValue "ok"))))
+
+  (fn process-payload
+    (params (payload Interchange))
+    (returns (Result Interchange Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local tool-name-result) (local payload))
+      (case (Ok name)
+        (variant (Result Interchange Diagnostic)
+                 Ok
+                 (call (local checked-payload) (local name))))
+      (case (Err diagnostic)
+        (variant (Result Interchange Diagnostic)
+                 Err
+                 (local diagnostic))))))

@@ -1,0 +1,25 @@
+(module example/tool_workflow_tests_json
+  (imports
+    (airj airj/test TestOutcome)
+    (airj airj/test-runner run-json)
+    (airj example/tool_workflow_test_suite suite))
+  (export tests
+          main)
+
+  (fn tests
+    (params)
+    (returns (Seq TestOutcome))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local suite)))
+
+  (fn main
+    (params (args StringSeq))
+    (returns Int)
+    (effects (Stdout.Write))
+    (requires true)
+    (ensures true)
+    (call (local run-json)
+          "example/tool_workflow_tests_json"
+          (call (local tests)))))

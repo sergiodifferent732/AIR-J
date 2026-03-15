@@ -1722,3 +1722,43 @@
       (should-contain "\"module\":\"example/tests_json\"" (:out result))
       (should-contain "\"passed\":1" (:out result))
       (should-contain "\"outcomes\":[{\"status\":\"pass\",\"name\":\"passing\"}]" (:out result))))
+
+  (it "builds and runs the ToolWorkflow example and its AIR-J test/report jars"
+    (let [project-dir "examples/ToolWorkflow"
+          workflow-jar (.toString (java.nio.file.Files/createTempFile "airj-tool-workflow"
+                                                                      ".jar"
+                                                                      (make-array java.nio.file.attribute.FileAttribute 0)))
+          tests-json-jar (.toString (java.nio.file.Files/createTempFile "airj-tool-workflow-tests"
+                                                                        ".jar"
+                                                                        (make-array java.nio.file.attribute.FileAttribute 0)))
+          report-jar (.toString (java.nio.file.Files/createTempFile "airj-tool-workflow-report"
+                                                                    ".jar"
+                                                                    (make-array java.nio.file.attribute.FileAttribute 0)))
+          input (.toString (java.nio.file.Files/createTempFile "airj-tool-workflow-input"
+                                                               ".json"
+                                                               (make-array java.nio.file.attribute.FileAttribute 0)))
+          output (.toString (java.nio.file.Files/createTempFile "airj-tool-workflow-output"
+                                                                ".json"
+                                                                (make-array java.nio.file.attribute.FileAttribute 0)))
+          json-report (.toString (java.nio.file.Files/createTempFile "airj-tool-workflow-tests"
+                                                                     ".json"
+                                                                     (make-array java.nio.file.attribute.FileAttribute 0)))
+          _ (spit input "{\"tool\":\"wumpus\"}")
+          _ (sut/build-project-dir-jar! project-dir 'example/tool_workflow workflow-jar)
+          _ (sut/build-project-dir-jar! project-dir 'example/tool_workflow_tests_json tests-json-jar)
+          _ (sut/build-project-dir-jar! project-dir 'example/tool_workflow_test_report report-jar)
+          workflow-result (run-jar-process workflow-jar "" input output)
+          tests-result (run-jar-process tests-json-jar "")
+          _ (spit json-report (:out tests-result))
+          report-result (run-jar-process report-jar "" json-report)]
+      (should= 0 (:exit workflow-result))
+      (should= "ok\n" (:out workflow-result))
+      (should= "" (:err workflow-result))
+      (should= "{\"tool\":\"wumpus-checked\",\"status\":\"ok\"}" (slurp output))
+      (should= 0 (:exit tests-result))
+      (should= "" (:err tests-result))
+      (should-contain "\"module\":\"example/tool_workflow_tests_json\"" (:out tests-result))
+      (should-contain "\"passed\":7" (:out tests-result))
+      (should= 0 (:exit report-result))
+      (should= "" (:err report-result))
+      (should= "7\n" (:out report-result))))

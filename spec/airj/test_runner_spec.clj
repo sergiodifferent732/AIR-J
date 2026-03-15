@@ -91,6 +91,39 @@
                  :name "tick-test"}]
                (:outcomes summary))))
 
+  (it "classifies assertion mismatches as failures rather than errors"
+    (let [source "(module example/tests
+                    (imports
+                      (airj airj/test TestOutcome assert-false)
+                      (airj airj/test-runner run))
+                    (export tests main)
+                    (fn tests
+                      (params)
+                      (returns (Seq TestOutcome))
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (seq-append
+                        (seq-empty TestOutcome)
+                        (call (local assert-false) \"failing\" true)))
+                    (fn main
+                      (params (args StringSeq))
+                      (returns Int)
+                      (effects (Stdout.Write))
+                      (requires true)
+                      (ensures true)
+                      (call (local run) (call (local tests)))))"
+          summary (sut/run-source-tests! source)]
+      (should= 0 (:passed summary))
+      (should= 1 (:failed summary))
+      (should= 0 (:errored summary))
+      (should= [{:status "fail"
+                 :name "failing"
+                 :diagnostic {:phase "test"
+                              :message "Expected false."
+                              :detail "Assertion evaluated to true."}}]
+               (:outcomes summary))))
+
   (it "rejects non-canonical test modules without exported tests and main"
     (let [source "(module example/tests
                     (imports

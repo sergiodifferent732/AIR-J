@@ -1,0 +1,72 @@
+(module example/tool_workflow_test_report
+  (imports
+    (airj airj/core Diagnostic Interchange Result)
+    (airj airj/file read-string-result)
+    (airj airj/json parse-result))
+  (export passed-count
+          main)
+
+  (fn passed-count
+    (params (payload Interchange))
+    (returns (Result Int Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (local payload)
+      (case (MapValue entries)
+        (match (map-get (local entries) "passed")
+          (case (Some field)
+            (match (local field)
+              (case (IntValue value)
+                (variant (Result Int Diagnostic)
+                         Ok
+                         (local value)))
+              (case _
+                (variant (Result Int Diagnostic)
+                         Err
+                         (construct Diagnostic
+                                    "test"
+                                    "Expected integer passed field."
+                                    "passed")))))
+          (case (None)
+            (variant (Result Int Diagnostic)
+                     Err
+                     (construct Diagnostic
+                                "test"
+                                "Missing passed field."
+                                "passed")))))
+      (case _
+        (variant (Result Int Diagnostic)
+                 Err
+                 (construct Diagnostic
+                            "test"
+                            "Expected object payload."
+                            "passed")))))
+
+  (fn main
+    (params (args StringSeq))
+    (returns Int)
+    (effects (File.Read Stdout.Write))
+    (requires (int-ge (seq-length (local args)) 1))
+    (ensures true)
+    (match (call (local read-string-result) (seq-get (local args) 0))
+      (case (Ok text)
+        (match (call (local parse-result) (local text))
+          (case (Ok payload)
+            (match (call (local passed-count) (local payload))
+              (case (Ok value)
+                (seq
+                  (io/println (int->string (local value)))
+                  0))
+              (case (Err diagnostic)
+                (seq
+                  (io/println (record-get (local diagnostic) message))
+                  1))))
+          (case (Err diagnostic)
+            (seq
+              (io/println (record-get (local diagnostic) message))
+              1))))
+      (case (Err diagnostic)
+        (seq
+          (io/println (record-get (local diagnostic) message))
+          1)))))

@@ -1,0 +1,217 @@
+(module example/tool_workflow_test_suite
+  (imports
+    (airj airj/core Diagnostic Interchange Result)
+    (airj airj/test TestOutcome
+                          assert-string-eq
+                          fail)
+    (airj example/tool_logic checked-name
+                              checked-payload
+                              process-payload
+                              status-result
+                              tool-name-result))
+  (export sample-payload
+          malformed-payload
+          missing-tool-payload
+          trimmed-tool-name
+          rejects-missing-tool-field
+          rejects-non-string-tool-field
+          rejects-non-map-payload
+          appends-checked-suffix
+          builds-checked-payload-tool
+          builds-checked-payload-status
+          processes-payload-through-normalized-output
+          suite)
+
+  (fn sample-payload
+    (params)
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (variant Interchange
+             MapValue
+             (map-set
+               (map-empty Interchange)
+               "tool"
+               (variant Interchange StringValue " wumpus "))))
+
+  (fn malformed-payload
+    (params)
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (variant Interchange StringValue "wumpus"))
+
+  (fn missing-tool-payload
+    (params)
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (variant Interchange
+             MapValue
+             (map-set
+               (map-empty Interchange)
+               "status"
+               (variant Interchange StringValue "ok"))))
+
+  (fn expect-ok-string
+    (params (name String) (actual (Result String Diagnostic)) (expected String))
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (local actual)
+      (case (Ok value)
+        (call (local assert-string-eq) (local name) (local value) (local expected)))
+      (case (Err diagnostic)
+        (call (local fail)
+              (local name)
+              "Expected Ok result."
+              (record-get (local diagnostic) message)))))
+
+  (fn expect-err-message
+    (params (name String) (actual (Result String Diagnostic)) (expected String))
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (local actual)
+      (case (Ok value)
+        (call (local fail)
+              (local name)
+              "Expected Err result."
+              (local value)))
+      (case (Err diagnostic)
+        (call (local assert-string-eq)
+              (local name)
+              (record-get (local diagnostic) message)
+              (local expected)))))
+
+  (fn trimmed-tool-name
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local expect-ok-string)
+          "trims tool name"
+          (call (local tool-name-result) (call (local sample-payload)))
+          "wumpus"))
+
+  (fn rejects-missing-tool-field
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local expect-err-message)
+          "rejects missing tool field"
+          (call (local tool-name-result) (call (local missing-tool-payload)))
+          "Missing tool field."))
+
+  (fn rejects-non-string-tool-field
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local expect-err-message)
+          "rejects non-string tool field"
+          (call (local tool-name-result)
+                (variant Interchange
+                         MapValue
+                         (map-set
+                           (map-empty Interchange)
+                           "tool"
+                           (variant Interchange IntValue 7))))
+          "Expected string tool field."))
+
+  (fn rejects-non-map-payload
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local expect-err-message)
+          "rejects non-map payload"
+          (call (local tool-name-result) (call (local malformed-payload)))
+          "Expected object payload."))
+
+  (fn appends-checked-suffix
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-string-eq)
+          "appends checked suffix"
+          (call (local checked-name) "wumpus ")
+          "wumpus-checked"))
+
+  (fn builds-checked-payload-tool
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local expect-ok-string)
+          "builds checked payload tool"
+          (call (local tool-name-result) (call (local checked-payload) "wumpus"))
+          "wumpus-checked"))
+
+  (fn builds-checked-payload-status
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local expect-ok-string)
+          "builds checked payload status"
+          (call (local status-result) (call (local checked-payload) "wumpus"))
+          "ok"))
+
+  (fn processes-payload-through-normalized-output
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local process-payload) (call (local sample-payload)))
+      (case (Ok payload)
+        (call (local expect-ok-string)
+              "processes payload through normalized output"
+              (call (local tool-name-result) (local payload))
+              "wumpus-checked"))
+      (case (Err diagnostic)
+        (call (local fail)
+              "processes payload through normalized output"
+              "Expected Ok result."
+              (record-get (local diagnostic) message)))))
+
+  (fn suite
+    (params)
+    (returns (Seq TestOutcome))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (seq-concat
+      (seq-append
+        (seq-append
+          (seq-append
+            (seq-append
+              (seq-empty TestOutcome)
+              (call (local trimmed-tool-name)))
+            (call (local rejects-missing-tool-field)))
+          (call (local rejects-non-string-tool-field)))
+        (call (local rejects-non-map-payload)))
+      (seq-append
+        (seq-append
+          (seq-append
+            (seq-empty TestOutcome)
+            (call (local appends-checked-suffix)))
+          (call (local builds-checked-payload-tool)))
+        (seq-append
+          (call (local builds-checked-payload-status))
+          (call (local processes-payload-through-normalized-output)))))))
