@@ -50,6 +50,13 @@
   (it "resolves imported declared type names and runtime variant class names"
     (let [ctx {:module-name 'example/use
                :decls {}
+               :interfaces {'airj/core {:name 'airj/core
+                                        :imports []
+                                        :exports ['Result]
+                                        :decls [{:op :union
+                                                 :name 'Result
+                                                 :type-params ['Ok 'Err]
+                                                 :variants []}]}}
                :imported-decls {'Result {:module 'airj/core
                                          :decl {:op :union
                                                 :name 'Result
@@ -61,6 +68,39 @@
                (sut/runtime-union-variant-class-name ctx
                                                      '(Result Int String)
                                                      'Err))))
+
+  (it "resolves nominal types referenced through imported module interfaces"
+    (let [ctx {:module-name 'example/use
+               :decls {}
+               :interfaces {'airj/core {:name 'airj/core
+                                        :imports []
+                                        :exports ['Result 'Option 'Diagnostic]
+                                        :decls [{:op :data
+                                                 :name 'Diagnostic
+                                                 :type-params []
+                                                 :fields []}
+                                                {:op :union
+                                                 :name 'Option
+                                                 :type-params ['T]
+                                                 :variants []}
+                                                {:op :union
+                                                 :name 'Result
+                                                 :type-params ['Ok 'Err]
+                                                 :variants []}]}}
+               :imported-decls {'assert-ok-int {:module 'airj/test
+                                                :decl {:op :fn
+                                                       :name 'assert-ok-int
+                                                       :params [{:name 'name :type 'String}
+                                                                {:name 'actual :type '(Result Int Diagnostic)}
+                                                                {:name 'expected :type 'Int}]
+                                                       :return-type 'TestOutcome
+                                                       :effects []}}}}]
+      (should= "airj/core$Result"
+               (sut/lower-type '(Result Int Diagnostic) ctx))
+      (should= "airj/core$Option"
+               (sut/lower-type '(Option String) ctx))
+      (should= 'Result
+               (:name (sut/decl-for-type ctx '(Result Int Diagnostic)))))))
 
   (it "erases generic runtime fields to Object while preserving instantiated expression types"
     (let [box-decl {:op :data
@@ -164,4 +204,4 @@
                   "Lowered branch types must agree."
                   (sut/join-branch-types :int
                                          :boolean
-                                         {:expr :if}))))
+                                         {:expr :if})))

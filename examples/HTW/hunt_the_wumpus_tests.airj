@@ -2,20 +2,24 @@
   (imports
     (airj airj/test TestOutcome
                           assert-bool-eq
+                          assert-int-eq
                           assert-string-eq)
     (airj airj/test-runner run)
-    (airj example/wumpus_logic adjacent?
+    (airj example/wumpus_logic GameState
+                                adjacent?
                                 any-bat-near?
-                                any-pit-near?
                                 bat?
                                 command-arg
                                 command-verb
                                 neighbor-text
                                 pit?
                                 prompt-text
+                                resolve-move
+                                resolve-shot
                                 valid-room?
                                 warning-near?))
-  (export parses-command-verb
+  (export opening-state
+          parses-command-verb
           parses-command-arg
           recognizes-adjacent-room
           rejects-invalid-room
@@ -26,8 +30,29 @@
           recognizes-bat-room
           formats-prompt-text
           formats-neighbor-text
+          moves-to-adjacent-room
+          blocks-nonadjacent-move
+          loses-when-moving-into-a-pit
+          relocates-after-bats
+          wins-when-shot-hits-wumpus
+          reduces-arrows-after-a-miss
+          loses-when-last-arrow-misses
+          command-tests
+          warning-tests
+          state-tests
           tests
           main)
+
+  (fn opening-state
+    (params)
+    (returns GameState)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (construct GameState
+               "1"
+               "11"
+               5))
 
   (fn parses-command-verb
     (params)
@@ -150,7 +175,108 @@
           (call (local prompt-text) 5)
           "Arrows: 5 | command: move <room>, shoot <room>, quit"))
 
-  (fn tests
+  (fn moves-to-adjacent-room
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((resolution (call (local resolve-move) (call (local opening-state)) "5" "9")))
+      (call (local assert-string-eq)
+            "moves to adjacent room"
+            (record-get (record-get (local resolution) state) player-room)
+            "5")))
+
+  (fn blocks-nonadjacent-move
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((resolution (call (local resolve-move) (call (local opening-state)) "11" "9")))
+      (call (local assert-string-eq)
+            "blocks nonadjacent move"
+            (record-get (local resolution) status)
+            "blocked")))
+
+  (fn loses-when-moving-into-a-pit
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((state (construct GameState "6" "11" 5)))
+      (let ((resolution (call (local resolve-move) (local state) "7" "9")))
+        (call (local assert-string-eq)
+              "loses when moving into a pit"
+              (record-get (local resolution) status)
+              "lost"))))
+
+  (fn relocates-after-bats
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((state (construct GameState "2" "11" 5)))
+      (let ((resolution (call (local resolve-move) (local state) "3" "9")))
+        (call (local assert-string-eq)
+              "relocates after bats"
+              (record-get (record-get (local resolution) state) player-room)
+              "9"))))
+
+  (fn wins-when-shot-hits-wumpus
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((state (construct GameState "10" "11" 5)))
+      (let ((resolution (call (local resolve-shot) (local state) "11" "12")))
+        (call (local assert-string-eq)
+              "wins when shot hits wumpus"
+              (record-get (local resolution) status)
+              "won"))))
+
+  (fn reduces-arrows-after-a-miss
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((state (construct GameState "10" "11" 5)))
+      (let ((resolution (call (local resolve-shot) (local state) "9" "12")))
+        (call (local assert-int-eq)
+              "reduces arrows after a miss"
+              (record-get (record-get (local resolution) state) arrows)
+              4))))
+
+  (fn loses-when-last-arrow-misses
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((state (construct GameState "10" "11" 1)))
+      (let ((resolution (call (local resolve-shot) (local state) "9" "12")))
+        (call (local assert-string-eq)
+              "loses when last arrow misses"
+              (record-get (local resolution) secondary-message)
+              "You are out of arrows. You lose."))))
+
+  (fn command-tests
+    (params)
+    (returns (Seq TestOutcome))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (seq-append
+      (seq-append
+        (seq-empty TestOutcome)
+        (call (local parses-command-verb)))
+      (call (local parses-command-arg))))
+
+  (fn warning-tests
     (params)
     (returns (Seq TestOutcome))
     (effects ())
@@ -164,11 +290,7 @@
               (seq-append
                 (seq-append
                   (seq-append
-                    (seq-append
-                      (seq-append
-                        (seq-empty TestOutcome)
-                        (call (local parses-command-verb)))
-                      (call (local parses-command-arg)))
+                    (seq-empty TestOutcome)
                     (call (local recognizes-adjacent-room)))
                   (call (local rejects-invalid-room)))
                 (call (local reports-wumpus-warning)))
@@ -176,11 +298,45 @@
             (call (local reports-bat-warning)))
           (call (local recognizes-pit-room)))
         (call (local recognizes-bat-room)))
+      (call (local formats-neighbor-text))))
+
+  (fn state-tests
+    (params)
+    (returns (Seq TestOutcome))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (seq-concat
       (seq-append
         (seq-append
-          (seq-empty TestOutcome)
-          (call (local formats-neighbor-text)))
-        (call (local formats-prompt-text)))))
+          (seq-append
+            (seq-append
+              (seq-append
+                (seq-append
+                  (seq-append
+                    (seq-empty TestOutcome)
+                    (call (local formats-prompt-text)))
+                  (call (local moves-to-adjacent-room)))
+                (call (local blocks-nonadjacent-move)))
+              (call (local loses-when-moving-into-a-pit)))
+            (call (local relocates-after-bats)))
+          (call (local wins-when-shot-hits-wumpus)))
+        (call (local reduces-arrows-after-a-miss)))
+      (seq-append
+        (seq-empty TestOutcome)
+        (call (local loses-when-last-arrow-misses)))))
+
+  (fn tests
+    (params)
+    (returns (Seq TestOutcome))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (seq-concat
+      (seq-concat
+        (call (local command-tests))
+        (call (local warning-tests)))
+      (call (local state-tests))))
 
   (fn main
     (params (args StringSeq))
@@ -189,3 +345,4 @@
     (requires true)
     (ensures true)
     (call (local run) (call (local tests)))))
+)

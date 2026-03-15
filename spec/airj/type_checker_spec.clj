@@ -1,5 +1,7 @@
 (ns airj.type-checker-spec
-  (:require [airj.type-checker :as sut]
+  (:require [airj.parser :as parser]
+            [airj.stdlib :as stdlib]
+            [airj.type-checker :as sut]
             [speclj.core :refer :all]))
 
 (describe "check-module"
@@ -648,6 +650,34 @@
                            :body {:op :call
                                   :callee {:op :local :name 'tick}
                                   :args [1]}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "accepts constructed imported nominal types referenced only through supplied interfaces"
+    (let [module (parser/parse-module
+                  "(module example/structured-tests
+                     (imports
+                       (airj airj/core parse-int)
+                       (airj airj/test TestOutcome assert-ok-int assert-none-string))
+                     (export tests)
+                     (fn tests
+                       (params)
+                       (returns (Seq TestOutcome))
+                       (effects ())
+                       (requires true)
+                       (ensures true)
+                       (seq-append
+                         (seq-append
+                           (seq-empty TestOutcome)
+                           (call (local assert-none-string)
+                                 \"none\"
+                                 (variant (Option String) None)))
+                         (call (local assert-ok-int)
+                               \"ok\"
+                               (call (local parse-int) \"7\")
+                               7))))")
+          module (assoc module
+                        :interfaces (stdlib/interfaces-for-module module)
+                        :available-modules #{'airj/core 'airj/test})]
       (should= module (sut/check-module module))))
 
   (it "rejects calls with wrong arity"

@@ -1052,6 +1052,53 @@
           result (sut/run-source! source [])]
       (should= 1 result)))
 
+  (it "runs imported structured-result assertions through the compiler"
+    (let [source "(module example/structured_test_program
+                    (imports
+                      (airj airj/core parse-int)
+                      (airj airj/test TestOutcome
+                                            assert-none-string
+                                            assert-ok-int
+                                            assert-some-string
+                                            assert-err-message)
+                      (airj airj/test-runner run))
+                    (export tests main)
+                    (fn tests
+                      (params)
+                      (returns (Seq TestOutcome))
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (seq-append
+                        (seq-append
+                          (seq-append
+                            (seq-append
+                              (seq-empty TestOutcome)
+                              (call (local assert-none-string)
+                                    \"none\"
+                                    (variant (Option String) None)))
+                            (call (local assert-some-string)
+                                  \"some\"
+                                  (variant (Option String) Some \"wumpus\")
+                                  \"wumpus\"))
+                          (call (local assert-ok-int)
+                                \"ok\"
+                                (call (local parse-int) \"7\")
+                                7))
+                        (call (local assert-err-message)
+                              \"err\"
+                              (call (local parse-int) \"boom\")
+                              \"Invalid integer.\")))
+                    (fn main
+                      (params)
+                      (returns Int)
+                      (effects (Stdout.Write))
+                      (requires true)
+                      (ensures true)
+                      (call (local run) (call (local tests))))))"
+          result (sut/run-source! source [])]
+      (should= 0 result)))
+
   (it "compiles direct local lambda calls into executable bytes"
     (let [source "(module example/lambdas
                     (imports)

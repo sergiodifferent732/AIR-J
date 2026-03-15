@@ -8,9 +8,16 @@ This example is a complete AIR-J console game with AIR-J unit tests. It is split
 
 ## Files
 
-- `wumpus_logic.airj`: pure game logic helpers
+- `wumpus_logic.airj`: pure game logic helpers plus move/shot resolution
 - `hunt_the_wumpus.airj`: the playable console game
 - `hunt_the_wumpus_tests.airj`: AIR-J unit tests using the canonical `tests` suite function plus an AIR-J runner `main`
+
+The tests exercise:
+
+- command parsing and formatting helpers
+- pure move and shot resolution
+- state transitions for pits, bats, misses, and wins
+- the console shell only as a thin wrapper around the pure logic
 
 ## Build A Runnable Jar
 

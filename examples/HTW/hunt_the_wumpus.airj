@@ -1,6 +1,7 @@
 (module example/hunt_the_wumpus
   (imports
-    (airj example/wumpus_logic adjacent?
+    (airj example/wumpus_logic GameState
+                                Resolution
                                 any-bat-near?
                                 any-pit-near?
                                 bat?
@@ -10,7 +11,8 @@
                                 neighbor-text
                                 pit?
                                 prompt-text
-                                valid-room?
+                                resolve-move
+                                resolve-shot
                                 warning-near?)
     (java java.util.Random))
   (export main)
@@ -38,6 +40,18 @@
         (seq-get
           (call (local neighbors) (local wumpus-room))
           (int-sub (local roll) 1)))))
+
+  (fn print-resolution
+    (params (resolution Resolution))
+    (returns Unit)
+    (effects (Stdout.Write))
+    (requires true)
+    (ensures true)
+    (seq
+      (io/println (record-get (local resolution) primary-message))
+      (if (string-empty? (record-get (local resolution) secondary-message))
+        (io/print "")
+        (io/println (record-get (local resolution) secondary-message)))))
 
   (fn print-room
     (params (player-room String) (wumpus-room String))
@@ -72,82 +86,69 @@
 
   (fn game-loop
     (params (rng (Java java.util.Random))
-            (player-room String)
-            (wumpus-room String)
-            (arrows Int))
+            (state GameState))
     (returns Int)
     (effects (Foreign.Throw Stdin.Read Stdout.Write))
     (requires true)
     (ensures true)
-    (loop ((current-player (local player-room))
-           (current-wumpus (local wumpus-room))
-           (current-arrows (local arrows)))
-      (if (string-eq (local current-player) (local current-wumpus))
-        (seq
-          (io/println "You enter the Wumpus room. You lose.")
-          1)
-        (if (call (local pit?) (local current-player))
-          (seq
-            (io/println "You fall into a bottomless pit. You lose.")
-            1)
-          (if (call (local bat?) (local current-player))
-            (seq
-              (io/println "Super bats whisk you to another room!")
-              (recur (call (local random-room) (local rng))
-                     (local current-wumpus)
-                     (local current-arrows)))
-            (seq
-              (call (local print-room) (local current-player) (local current-wumpus))
-              (io/println (call (local prompt-text) (local current-arrows)))
-              (let ((line (io/read-line)))
-                (let ((verb (call (local command-verb) (local line))))
-                  (let ((arg (call (local command-arg) (local line))))
-                    (if (string-eq (local verb) "quit")
-                      (seq
-                        (io/println "Goodbye.")
-                        0)
-                      (if (string-eq (local verb) "move")
-                        (if (bool-and
-                              (call (local valid-room?) (local arg))
-                              (call (local adjacent?) (local current-player) (local arg)))
-                          (recur (local arg)
-                                 (local current-wumpus)
-                                 (local current-arrows))
-                          (seq
-                            (io/println "You can only move to an adjacent room.")
-                            (recur (local current-player)
-                                   (local current-wumpus)
-                                   (local current-arrows))))
-                        (if (string-eq (local verb) "shoot")
-                          (if (bool-and
-                                (call (local valid-room?) (local arg))
-                                (call (local adjacent?) (local current-player) (local arg)))
-                            (if (string-eq (local arg) (local current-wumpus))
-                              (seq
-                                (io/println "Your arrow strikes true. You win!")
-                                0)
-                              (let ((next-arrows (int-sub (local current-arrows) 1)))
-                                (let ((next-wumpus (call (local moved-wumpus) (local rng) (local current-wumpus))))
-                                  (if (int-eq (local next-arrows) 0)
-                                    (seq
-                                      (io/println "Your arrow misses.")
-                                      (io/println "You are out of arrows. You lose.")
-                                      1)
-                                    (seq
-                                      (io/println "Your arrow misses.")
-                                      (recur (local current-player)
-                                             (local next-wumpus)
-                                             (local next-arrows)))))))
+    (loop ((current-state (local state)))
+      (let ((current-player (record-get (local current-state) player-room)))
+        (let ((current-wumpus (record-get (local current-state) wumpus-room)))
+          (let ((current-arrows (record-get (local current-state) arrows)))
+            (if (string-eq (local current-player) (local current-wumpus))
+              (seq
+                (io/println "You enter the Wumpus room. You lose.")
+                1)
+              (if (call (local pit?) (local current-player))
+                (seq
+                  (io/println "You fall into a bottomless pit. You lose.")
+                  1)
+                (if (call (local bat?) (local current-player))
+                  (seq
+                    (io/println "Super bats whisk you to another room!")
+                    (recur (construct GameState
+                                      (call (local random-room) (local rng))
+                                      (local current-wumpus)
+                                      (local current-arrows))))
+                  (seq
+                    (call (local print-room) (local current-player) (local current-wumpus))
+                    (io/println (call (local prompt-text) (local current-arrows)))
+                    (let ((line (io/read-line)))
+                      (let ((verb (call (local command-verb) (local line))))
+                        (let ((arg (call (local command-arg) (local line))))
+                          (if (string-eq (local verb) "quit")
                             (seq
-                              (io/println "You can only shoot into an adjacent room.")
-                              (recur (local current-player)
-                                     (local current-wumpus)
-                                     (local current-arrows))))
-                          (seq
-                            (io/println "Unknown command.")
-                            (recur (local current-player)
-                                   (local current-wumpus)
-                                   (local current-arrows)))))))))))))))
+                              (io/println "Goodbye.")
+                              0)
+                            (if (string-eq (local verb) "shoot")
+                              (let ((resolution
+                                      (call (local resolve-shot)
+                                            (local current-state)
+                                            (local arg)
+                                            (call (local moved-wumpus) (local rng) (local current-wumpus)))))
+                                (seq
+                                  (call (local print-resolution) (local resolution))
+                                  (if (bool-or
+                                        (string-eq (record-get (local resolution) status) "won")
+                                        (string-eq (record-get (local resolution) status) "lost"))
+                                    (if (string-eq (record-get (local resolution) status) "won")
+                                      0
+                                      1)
+                                    (recur (record-get (local resolution) state)))))
+                              (if (string-eq (local verb) "move")
+                                (let ((resolution
+                                        (call (local resolve-move)
+                                              (local current-state)
+                                              (local arg)
+                                              (call (local random-room) (local rng)))))
+                                  (seq
+                                    (call (local print-resolution) (local resolution))
+                                    (if (string-eq (record-get (local resolution) status) "lost")
+                                      1
+                                      (recur (record-get (local resolution) state)))))
+                                (seq
+                                  (io/println "Unknown command.")
+                                  (recur (local current-state))))))))))))))))))
 
   (fn main
     (params (args StringSeq))
@@ -159,6 +160,7 @@
       (call (local intro))
       (call (local game-loop)
             (java/new java.util.Random)
-            "1"
-            "11"
-            5))))
+            (construct GameState
+                       "1"
+                       "11"
+                       5))))))

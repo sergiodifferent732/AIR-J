@@ -212,7 +212,7 @@
    'airj/test
    "(module airj/test
       (imports
-        (airj airj/core Diagnostic))
+        (airj airj/core Diagnostic Option Result))
       (export AssertionFailure
               TestOutcome
               TestSummary
@@ -223,7 +223,11 @@
               assert-false
               assert-bool-eq
               assert-int-eq
-              assert-string-eq)
+              assert-string-eq
+              assert-none-string
+              assert-some-string
+              assert-ok-int
+              assert-err-message)
       (data AssertionFailure
         (field expected String)
         (field actual String))
@@ -342,7 +346,66 @@
                 \"String equality assertion failed.\"
                 (string-concat
                   (string-concat \"expected=\" (local expected))
-                  (string-concat \", actual=\" (local actual)))))))"
+                  (string-concat \", actual=\" (local actual))))))
+      (fn assert-none-string
+        (params (name String) (actual (Option String)))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (match (local actual)
+          (case (None)
+            (call (local pass) (local name)))
+          (case (Some value)
+            (call (local fail)
+                  (local name)
+                  \"Expected None.\"
+                  (string-concat \"actual=Some(\" (string-concat (local value) \")\"))))))
+      (fn assert-some-string
+        (params (name String) (actual (Option String)) (expected String))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (match (local actual)
+          (case (None)
+            (call (local fail)
+                  (local name)
+                  \"Expected Some value.\"
+                  \"actual=None\"))
+          (case (Some value)
+            (call (local assert-string-eq) (local name) (local value) (local expected)))))
+      (fn assert-ok-int
+        (params (name String) (actual (Result Int Diagnostic)) (expected Int))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (match (local actual)
+          (case (Ok value)
+            (call (local assert-int-eq) (local name) (local value) (local expected)))
+          (case (Err diagnostic)
+            (call (local fail)
+                  (local name)
+                  \"Expected Ok result.\"
+                  (record-get (local diagnostic) message)))))
+      (fn assert-err-message
+        (params (name String) (actual (Result Int Diagnostic)) (expected String))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (match (local actual)
+          (case (Ok value)
+            (call (local fail)
+                  (local name)
+                  \"Expected Err result.\"
+                  (string-concat \"actual=Ok(\" (string-concat (int->string (local value)) \")\"))))
+          (case (Err diagnostic)
+            (call (local assert-string-eq)
+                  (local name)
+                  (record-get (local diagnostic) message)
+                  (local expected)))))))"
 
    'airj/test-runner
    "(module airj/test-runner
@@ -770,5 +833,5 @@
       seen)))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-15T12:52:57.402698-05:00", :module-hash "1557845357", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 731, :hash "-1782081869"} {:id "defn/source-map", :kind "defn", :line 733, :end-line 735, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 737, :end-line 739, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 741, :end-line 743, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 745, :end-line 747, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 749, :end-line 755, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 757, :end-line 770, :hash "-1038087388"}]}
+;; {:version 1, :tested-at "2026-03-15T13:16:04.801346-05:00", :module-hash "-696674536", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 794, :hash "-1442247769"} {:id "defn/source-map", :kind "defn", :line 796, :end-line 798, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 800, :end-line 802, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 804, :end-line 806, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 808, :end-line 810, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 812, :end-line 818, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 820, :end-line 833, :hash "-1038087388"}]}
 ;; clj-mutate-manifest-end

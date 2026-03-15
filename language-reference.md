@@ -398,6 +398,70 @@ Canonical process boundary:
 - `stdout : Bytes`
 - `stderr : Bytes`
 
+### `airj/test`
+
+Canonical test data and assertions:
+- `TestOutcome`
+- `TestSummary`
+- `pass`
+- `fail`
+- `error`
+- `assert-true`
+- `assert-false`
+- `assert-bool-eq`
+- `assert-int-eq`
+- `assert-string-eq`
+- `assert-none-string`
+- `assert-some-string`
+- `assert-ok-int`
+- `assert-err-message`
+
+### `airj/test-runner`
+
+AIR-J-native test execution helpers:
+- `empty-summary`
+- `record`
+- `summarize`
+- `run`
+- `failure-count`
+- `exit-code`
+- `render-outcome`
+- `render-summary`
+- `print-summary`
+
+## Canonical Test Modules
+
+AIR-J test modules should use one canonical shape:
+- import `airj/test` for `TestOutcome` and assertions
+- export a zero-arg `tests` function returning `(Seq TestOutcome)`
+- implement `main` as a direct call to `airj/test-runner.run`
+
+Example:
+
+```lisp
+(module example/tests
+  (imports
+    (airj airj/test TestOutcome assert-true)
+    (airj airj/test-runner run))
+  (export tests main)
+  (fn tests
+    (params)
+    (returns (Seq TestOutcome))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (seq-append
+      (seq-empty TestOutcome)
+      (call (local assert-true) "smoke" true)))
+  (fn main
+    (params (args StringSeq))
+    (returns Int)
+    (effects (Stdout.Write))
+    (requires true)
+    (ensures true)
+    (call (local run) (call (local tests)))))
+```
+
 ## Failure Model
 
 AIR-J uses two distinct boundary styles:

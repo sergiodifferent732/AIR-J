@@ -90,8 +90,19 @@ AIR-J keeps host interaction in a small canonical module surface:
 - `airj/file`: canonical filesystem boundary
 - `airj/json`: canonical JSON interchange boundary
 - `airj/process`: canonical subprocess boundary
+- `airj/test`: canonical test outcomes and assertions
+- `airj/test-runner`: AIR-J-native test summary and exit-code logic
 
 These modules exist to reduce representation drift. They are the default machine-facing boundary, and raw Java interop should be reserved for intentional foreign integration.
+
+## AIR-J Tests
+
+The canonical AIR-J test shape is:
+- a module exports a zero-arg `tests` function returning `(Seq TestOutcome)`
+- `main` delegates to `airj/test-runner.run`
+- the resulting module can be built and run like any other AIR-J jar
+
+See [`examples/HTW/README.md`](/Users/unclebob/projects/AIR-J/examples/HTW/README.md) for a complete AIR-J-native test jar example.
 
 ## Development Workflow
 

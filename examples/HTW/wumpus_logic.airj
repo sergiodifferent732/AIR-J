@@ -1,6 +1,8 @@
 (module example/wumpus_logic
   (imports)
   (export rooms
+          GameState
+          Resolution
           neighbors
           contains-room?
           valid-room?
@@ -14,7 +16,9 @@
           prompt-text
           trimmed-parts
           command-verb
-          command-arg)
+          command-arg
+          resolve-move
+          resolve-shot)
 
   (fn rooms
     (params)
@@ -23,6 +27,17 @@
     (requires true)
     (ensures true)
     (string-split-on "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20" " "))
+
+  (data GameState
+    (field player-room String)
+    (field wumpus-room String)
+    (field arrows Int))
+
+  (data Resolution
+    (field status String)
+    (field primary-message String)
+    (field secondary-message String)
+    (field state GameState))
 
   (fn neighbors
     (params (room String))
@@ -202,4 +217,103 @@
     (let ((parts (call (local trimmed-parts) (local line))))
       (if (int-gt (seq-length (local parts)) 1)
         (seq-get (local parts) 1)
-        ""))))
+        "")))
+
+  (fn resolve-move
+    (params (state GameState) (destination String) (bat-destination String))
+    (returns Resolution)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((player-room (record-get (local state) player-room)))
+      (let ((wumpus-room (record-get (local state) wumpus-room)))
+        (let ((arrows (record-get (local state) arrows)))
+          (if (bool-not
+                (bool-and
+                  (call (local valid-room?) (local destination))
+                  (call (local adjacent?) (local player-room) (local destination))))
+            (construct Resolution
+                       "blocked"
+                       "You can only move to an adjacent room."
+                       ""
+                       (local state))
+            (if (string-eq (local destination) (local wumpus-room))
+              (construct Resolution
+                         "lost"
+                         "You enter the Wumpus room. You lose."
+                         ""
+                         (construct GameState
+                                    (local destination)
+                                    (local wumpus-room)
+                                    (local arrows)))
+              (if (call (local pit?) (local destination))
+                (construct Resolution
+                           "lost"
+                           "You fall into a bottomless pit. You lose."
+                           ""
+                           (construct GameState
+                                      (local destination)
+                                      (local wumpus-room)
+                                      (local arrows)))
+                (if (call (local bat?) (local destination))
+                  (construct Resolution
+                             "bat"
+                             "Super bats whisk you to another room!"
+                             ""
+                             (construct GameState
+                                        (local bat-destination)
+                                        (local wumpus-room)
+                                        (local arrows)))
+                  (construct Resolution
+                             "continue"
+                             (string-concat "You move to room " (local destination))
+                             ""
+                             (construct GameState
+                                        (local destination)
+                                        (local wumpus-room)
+                                        (local arrows))))))))))
+  )
+
+  (fn resolve-shot
+    (params (state GameState) (target String) (next-wumpus-room String))
+    (returns Resolution)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((player-room (record-get (local state) player-room)))
+      (let ((wumpus-room (record-get (local state) wumpus-room)))
+        (let ((arrows (record-get (local state) arrows)))
+          (if (bool-not
+                (bool-and
+                  (call (local valid-room?) (local target))
+                  (call (local adjacent?) (local player-room) (local target))))
+            (construct Resolution
+                       "blocked"
+                       "You can only shoot into an adjacent room."
+                       ""
+                       (local state))
+            (if (string-eq (local target) (local wumpus-room))
+              (construct Resolution
+                         "won"
+                         "Your arrow strikes true. You win!"
+                         ""
+                         (local state))
+              (let ((next-arrows (int-sub (local arrows) 1)))
+                (let ((next-state
+                        (construct GameState
+                                   (local player-room)
+                                   (local next-wumpus-room)
+                                   (local next-arrows))))
+                  (if (int-eq (local next-arrows) 0)
+                    (construct Resolution
+                               "lost"
+                               "Your arrow misses."
+                               "You are out of arrows. You lose."
+                               (local next-state))
+                    (construct Resolution
+                               "continue"
+                               "Your arrow misses."
+                               ""
+                               (local next-state)))))))))))
+)
+)

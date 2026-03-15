@@ -74,6 +74,7 @@
         exports (set (:exports module))
         ctx {:module-name (:name module)
              :decls decls
+             :interfaces (:interfaces module)
              :imported-decls (imported-interfaces/imported-decls module)
              :closure-counter (atom 0)
              :closures (atom [])
@@ -111,5 +112,5 @@
       (assoc :closures (vec @(:closures ctx))))))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-14T06:56:30.327333-05:00", :module-hash "1841608186", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 5, :hash "-580314099"} {:id "defn-/lower-field", :kind "defn-", :line 7, :end-line 10, :hash "-959639482"} {:id "defn-/lower-record", :kind "defn-", :line 12, :end-line 17, :hash "-1430731661"} {:id "defn-/lower-enum", :kind "defn-", :line 19, :end-line 23, :hash "507139670"} {:id "defn-/lower-union-variant", :kind "defn-", :line 25, :end-line 29, :hash "-261619844"} {:id "defn-/lower-union", :kind "defn-", :line 31, :end-line 36, :hash "-211833484"} {:id "defn-/lower-decls", :kind "defn-", :line 38, :end-line 42, :hash "533670331"} {:id "defn-/host-type-expr", :kind "defn-", :line 44, :end-line 47, :hash "-398773626"} {:id "defn-/bridgeable-host-method?", :kind "defn-", :line 49, :end-line 55, :hash "-1014172909"} {:id "defn-/lower-instance-method", :kind "defn-", :line 57, :end-line 69, :hash "-1618807735"} {:id "defn/lower-module", :kind "defn", :line 71, :end-line 111, :hash "400967000"}]}
+;; {:version 1, :tested-at "2026-03-15T13:15:07.749268-05:00", :module-hash "460475657", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 5, :hash "-580314099"} {:id "defn-/lower-field", :kind "defn-", :line 7, :end-line 10, :hash "-959639482"} {:id "defn-/lower-record", :kind "defn-", :line 12, :end-line 17, :hash "2139676234"} {:id "defn-/lower-enum", :kind "defn-", :line 19, :end-line 23, :hash "507139670"} {:id "defn-/lower-union-variant", :kind "defn-", :line 25, :end-line 29, :hash "1737223073"} {:id "defn-/lower-union", :kind "defn-", :line 31, :end-line 36, :hash "370344817"} {:id "defn-/lower-decls", :kind "defn-", :line 38, :end-line 42, :hash "920886774"} {:id "defn-/host-type-expr", :kind "defn-", :line 44, :end-line 47, :hash "-398773626"} {:id "defn-/bridgeable-host-method?", :kind "defn-", :line 49, :end-line 55, :hash "-1014172909"} {:id "defn-/lower-instance-method", :kind "defn-", :line 57, :end-line 69, :hash "430233041"} {:id "defn/lower-module", :kind "defn", :line 71, :end-line 112, :hash "-121591335"}]}
 ;; clj-mutate-manifest-end
