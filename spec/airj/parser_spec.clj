@@ -82,6 +82,81 @@
                                       (imports)
                                       (export))")))
 
+  (it "reports missing closing delimiters with reader location"
+    (try
+      (sut/parse-module "(module example/broken
+                          (imports)
+                          (export)
+                          (fn main
+                            (params (args StringSeq))
+                            (returns Int)
+                            (effects ())
+                            (requires true)
+                            (ensures true)
+                            (seq
+                              (io/println \"hi\")
+                              0))")
+      (should false)
+      (catch clojure.lang.ExceptionInfo e
+        (should= "Reader error: missing closing delimiter." (.getMessage e))
+        (should-contain "Expected a closing ')'" (:detail (ex-data e))))))
+
+  (it "reports unexpected closing delimiters with reader location"
+    (try
+      (sut/parse-module "(module example/broken
+                          (imports [)
+                          (export))")
+      (should false)
+      (catch clojure.lang.ExceptionInfo e
+        (should= "Reader error: unexpected closing delimiter." (.getMessage e))
+        (should-contain "does not match any open form" (:detail (ex-data e))))))
+
+  (it "reports generic reader failures with reader details"
+    (try
+      (sut/parse-module "(module example/broken
+                          #foo/bar []
+                          (imports)
+                          (export))")
+      (should false)
+      (catch clojure.lang.ExceptionInfo e
+        (should= "Reader error." (.getMessage e))
+        (should-contain "No reader function for tag foo/bar" (:detail (ex-data e))))))
+
+  (it "reports a missing export section in module order"
+    (try
+      (sut/parse-module "(module example/broken
+                          (imports)
+                          (fn main
+                            (params)
+                            (returns Int)
+                            (effects ())
+                            (requires true)
+                            (ensures true)
+                            0))")
+      (should false)
+      (catch clojure.lang.ExceptionInfo e
+        (should= "Unexpected form tag." (.getMessage e))
+        (should= 'export (:expected (ex-data e)))
+        (should= 'fn (:actual (ex-data e))))))
+
+  (it "reports missing fn sections with the expected clause"
+    (try
+      (sut/parse-module "(module example/broken
+                          (imports)
+                          (export main)
+                          (fn main
+                            (params)
+                            (returns Int)
+                            true
+                            (requires true)
+                            (ensures true)
+                            0))")
+      (should false)
+      (catch clojure.lang.ExceptionInfo e
+        (should= "Malformed AIR-J form." (.getMessage e))
+        (should= 'effects (:context (ex-data e)))
+        (should-contain "Expected a parenthesized form." (:detail (ex-data e))))))
+
   (it "parses data, enum, and union declarations"
     (let [source "(module example/types
                     (imports)
@@ -372,7 +447,7 @@
                 :class-name 'java.util.ArrayList
                 :type-args ['String]
                 :args []}
-               (-> ast :decls first :body)))))
+               (-> ast :decls first :body))))
 
   (it "parses static Java field access"
     (let [source "(module example/java-static-field
@@ -667,7 +742,7 @@
                                         (effects ())
                                         (requires true)
                                         (ensures true)
-                                        (when true 1))")))
+                                        (when true 1))))")))
 
   (it "rejects unless as a non-canonical persisted form"
     (should-throw clojure.lang.ExceptionInfo
@@ -681,7 +756,7 @@
                                         (effects ())
                                         (requires true)
                                         (ensures true)
-                                        (unless true 1))")))
+                                        (unless true 1))))")))
 
   (it "parses structured AIR-J imports"
     (let [source "(module example/imports
@@ -748,3 +823,4 @@
                                 {:op :local
                                  :name 'stdin}]}]}
                (-> ast :decls first :body))))
+  )

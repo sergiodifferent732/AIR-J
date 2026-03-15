@@ -1,5 +1,8 @@
 (ns airj.parser
-  (:require [clojure.edn :as edn]))
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str])
+  (:import (clojure.lang LineNumberingPushbackReader)
+           (java.io StringReader)))
 
 (declare parse-expr)
 (declare parse-pattern)
@@ -7,6 +10,66 @@
 (defn- fail!
   [message data]
   (throw (ex-info message (assoc data :phase :parse))))
+
+(defn- reader-location
+  [data]
+  (cond-> {}
+    (:line data) (assoc :line (:line data))
+    (:column data) (assoc :column (:column data))))
+
+(defn- reader-diagnostic
+  [message data]
+  (let [text (or message "")
+        location (reader-location data)]
+    (cond
+      (str/includes? text "EOF while reading")
+      (fail! "Reader error: missing closing delimiter."
+             (merge {:detail "Expected a closing ')' before end of source."}
+                    location))
+
+      (str/includes? text "Unmatched delimiter")
+      (fail! "Reader error: unexpected closing delimiter."
+             (merge {:detail "Found a ')' that does not match any open form."}
+                    location))
+
+      :else
+      (fail! "Reader error."
+             (merge {:detail text}
+                    location)))))
+
+(defn- read-source-form
+  [source]
+  (with-open [reader (LineNumberingPushbackReader. (StringReader. source))]
+    (try
+      (edn/read {:eof ::eof} reader)
+      (catch clojure.lang.ExceptionInfo e
+        (reader-diagnostic (.getMessage e) (ex-data e)))
+      (catch RuntimeException e
+        (reader-diagnostic (.getMessage e) (ex-data e))))))
+
+(defn- expect-seq-form
+  [form context]
+  (when-not (sequential? form)
+    (fail! "Malformed AIR-J form."
+           {:context context
+            :detail "Expected a parenthesized form."
+            :form form})))
+
+(defn- expect-count
+  [form expected context]
+  (when-not (= expected (count form))
+    (fail! "Malformed AIR-J form."
+           {:context context
+            :detail (str "Expected " expected " elements.")
+            :form form})))
+
+(defn- expect-at-least
+  [form minimum context]
+  (when (< (count form) minimum)
+    (fail! "Malformed AIR-J form."
+           {:context context
+            :detail (str "Expected at least " minimum " elements.")
+            :form form})))
 
 (defn- parse-import
   [[tag target & symbols :as form]]
@@ -25,6 +88,7 @@
 
 (defn- expect-tag
   [expected form]
+  (expect-seq-form form expected)
   (when-not (= expected (first form))
     (fail! "Unexpected form tag."
            {:expected expected
@@ -45,7 +109,9 @@
   [forms]
   (if (and (seq forms)
            (= 'host (ffirst forms)))
-    [{:class-name (second (first forms))} (rest forms)]
+    (do
+      (expect-count (first forms) 2 'host)
+      [{:class-name (second (first forms))} (rest forms)])
     [nil forms]))
 
 (defn- parse-param
@@ -179,6 +245,8 @@
 
 (defn- parse-lambda-expr
   [[_ params-form returns-form effects-form body-form]]
+  (expect-tag 'params params-form)
+  (expect-tag 'returns returns-form)
   {:op :lambda
    :params (mapv parse-param (rest params-form))
    :return-type (second returns-form)
@@ -519,16 +587,28 @@
      :variants (mapv parse-variant-decl forms)}))
 
 (defn- parse-fn-decl
-  [[tag name params-form returns-form effects-form requires-form ensures-form body-form]]
-  (expect-tag 'fn [tag])
-  {:op :fn
-   :name name
-   :params (mapv parse-param (rest params-form))
-   :return-type (second returns-form)
-   :effects (parse-effects effects-form)
-   :requires (parse-contract-clause 'requires requires-form)
-   :ensures (parse-contract-clause 'ensures ensures-form)
-   :body (parse-expr body-form)})
+  [form]
+  (expect-at-least form 8 'fn)
+  (let [[tag name params-form returns-form effects-form requires-form ensures-form body-form & extra] form]
+    (expect-tag 'fn [tag])
+    (when (seq extra)
+      (fail! "Malformed fn declaration."
+             {:context 'fn
+              :detail "Expected exactly one function body expression."
+              :form form}))
+    (expect-tag 'params params-form)
+    (expect-tag 'returns returns-form)
+    (expect-tag 'effects effects-form)
+    (expect-tag 'requires requires-form)
+    (expect-tag 'ensures ensures-form)
+    {:op :fn
+     :name name
+     :params (mapv parse-param (rest params-form))
+     :return-type (second returns-form)
+     :effects (parse-effects effects-form)
+     :requires (parse-contract-clause 'requires requires-form)
+     :ensures (parse-contract-clause 'ensures ensures-form)
+     :body (parse-expr body-form)}))
 
 (defn- parse-decl
   [form]
@@ -551,10 +631,24 @@
 
 (defn parse-module
   [source]
-  (let [[tag name & forms] (edn/read-string source)
+  (let [[tag name & forms :as module-form] (read-source-form source)
         [host forms] (parse-host forms)
         [imports-form export-form & decl-forms] forms]
+    (expect-seq-form module-form 'module)
+    (expect-at-least module-form 4 'module)
     (expect-tag 'module [tag])
+    (when-not imports-form
+      (fail! "Malformed module."
+             {:context 'module
+              :detail "Expected (imports ...) after the module header."
+              :form module-form}))
+    (when-not export-form
+      (fail! "Malformed module."
+             {:context 'module
+              :detail "Expected (export ...) immediately after (imports ...)."
+              :form module-form}))
+    (expect-tag 'imports imports-form)
+    (expect-tag 'export export-form)
     (cond-> {:name name
              :imports (parse-imports imports-form)
              :exports (parse-exports export-form)
@@ -563,5 +657,5 @@
       (assoc :host host))))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-14T14:39:07.622938-05:00", :module-hash "557005124", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 2, :hash "1367613317"} {:id "form/1/declare", :kind "declare", :line 4, :end-line 4, :hash "1128659220"} {:id "form/2/declare", :kind "declare", :line 5, :end-line 5, :hash "-1446383543"} {:id "defn-/fail!", :kind "defn-", :line 7, :end-line 9, :hash "444631387"} {:id "defn-/parse-import", :kind "defn-", :line 11, :end-line 24, :hash "-1464173778"} {:id "defn-/expect-tag", :kind "defn-", :line 26, :end-line 32, :hash "265017371"} {:id "defn-/parse-imports", :kind "defn-", :line 34, :end-line 37, :hash "2124099339"} {:id "defn-/parse-exports", :kind "defn-", :line 39, :end-line 42, :hash "987718804"} {:id "defn-/parse-host", :kind "defn-", :line 44, :end-line 49, :hash "552281819"} {:id "defn-/parse-param", :kind "defn-", :line 51, :end-line 54, :hash "949945736"} {:id "defn-/parse-field", :kind "defn-", :line 56, :end-line 60, :hash "1251715611"} {:id "defn-/parse-effects", :kind "defn-", :line 62, :end-line 77, :hash "2129032603"} {:id "defn-/parse-contract-clause", :kind "defn-", :line 79, :end-line 82, :hash "2065410627"} {:id "defn-/parse-invariants", :kind "defn-", :line 84, :end-line 89, :hash "192681247"} {:id "defn-/parse-type-params", :kind "defn-", :line 91, :end-line 96, :hash "-1233585086"} {:id "defn-/parse-data-decl", :kind "defn-", :line 98, :end-line 106, :hash "240075906"} {:id "defn-/parse-enum-decl", :kind "defn-", :line 108, :end-line 112, :hash "53471563"} {:id "defn-/parse-variant-decl", :kind "defn-", :line 114, :end-line 118, :hash "545649087"} {:id "defn-/parse-case", :kind "defn-", :line 120, :end-line 124, :hash "505569259"} {:id "defn-/parse-call-expr", :kind "defn-", :line 126, :end-line 130, :hash "1364196914"} {:id "defn-/parse-construct-expr", :kind "defn-", :line 132, :end-line 136, :hash "587366883"} {:id "defn-/parse-variant-expr", :kind "defn-", :line 138, :end-line 143, :hash "-385235348"} {:id "defn-/parse-record-get-expr", :kind "defn-", :line 145, :end-line 149, :hash "1628847814"} {:id "defn-/parse-if-expr", :kind "defn-", :line 151, :end-line 156, :hash "-1106654283"} {:id "defn-/parse-match-expr", :kind "defn-", :line 158, :end-line 162, :hash "1800281827"} {:id "defn-/parse-binding", :kind "defn-", :line 164, :end-line 167, :hash "-1959265528"} {:id "defn-/parse-let-expr", :kind "defn-", :line 169, :end-line 173, :hash "-647963169"} {:id "defn-/parse-seq-expr", :kind "defn-", :line 175, :end-line 178, :hash "302220611"} {:id "defn-/parse-lambda-expr", :kind "defn-", :line 180, :end-line 186, :hash "-1706998005"} {:id "defn-/parse-catch-clause", :kind "defn-", :line 188, :end-line 193, :hash "1820817090"} {:id "defn-/parse-finally-clause", :kind "defn-", :line 195, :end-line 198, :hash "-378492021"} {:id "defn-/parse-try-expr", :kind "defn-", :line 200, :end-line 209, :hash "716102796"} {:id "defn-/parse-var-expr", :kind "defn-", :line 211, :end-line 216, :hash "1325393821"} {:id "defn-/parse-set-expr", :kind "defn-", :line 218, :end-line 222, :hash "1429713983"} {:id "defn-/parse-loop-expr", :kind "defn-", :line 224, :end-line 228, :hash "-198693472"} {:id "defn-/parse-recur-expr", :kind "defn-", :line 230, :end-line 233, :hash "-1009172251"} {:id "defn-/parse-raise-expr", :kind "defn-", :line 235, :end-line 238, :hash "-1091784450"} {:id "defn-/parse-primitive-unary-expr", :kind "defn-", :line 240, :end-line 243, :hash "1155615128"} {:id "defn-/parse-primitive-binary-expr", :kind "defn-", :line 245, :end-line 248, :hash "-981498976"} {:id "defn-/parse-io-read-line-expr", :kind "defn-", :line 250, :end-line 252, :hash "1866185537"} {:id "defn-/parse-io-print-expr", :kind "defn-", :line 254, :end-line 257, :hash "2139111722"} {:id "defn-/parse-io-println-expr", :kind "defn-", :line 259, :end-line 262, :hash "-369802684"} {:id "defn-/parse-string-split-on-expr", :kind "defn-", :line 264, :end-line 267, :hash "-549703719"} {:id "defn-/parse-seq-get-expr", :kind "defn-", :line 269, :end-line 272, :hash "683923185"} {:id "defn-/parse-map-empty-expr", :kind "defn-", :line 274, :end-line 277, :hash "-922121204"} {:id "defn-/parse-string-substring-expr", :kind "defn-", :line 279, :end-line 282, :hash "-2136231073"} {:id "defn-/parse-type-args", :kind "defn-", :line 284, :end-line 287, :hash "-266637052"} {:id "defn-/parse-signature", :kind "defn-", :line 289, :end-line 293, :hash "804347329"} {:id "defn-/parse-java-new-expr", :kind "defn-", :line 295, :end-line 306, :hash "-1667842733"} {:id "defn-/parse-java-call-expr", :kind "defn-", :line 308, :end-line 314, :hash "-1542269505"} {:id "defn-/parse-java-static-call-expr", :kind "defn-", :line 316, :end-line 322, :hash "1075951034"} {:id "defn-/parse-java-get-field-expr", :kind "defn-", :line 324, :end-line 329, :hash "1853237465"} {:id "defn-/parse-java-static-get-field-expr", :kind "defn-", :line 331, :end-line 336, :hash "-1799498212"} {:id "defn-/parse-java-set-field-expr", :kind "defn-", :line 338, :end-line 344, :hash "-2021484420"} {:id "defn-/parse-java-static-set-field-expr", :kind "defn-", :line 346, :end-line 352, :hash "-1416091135"} {:id "def/expr-handlers", :kind "def", :line 354, :end-line 444, :hash "868747352"} {:id "defn-/literal-pattern?", :kind "defn-", :line 446, :end-line 451, :hash "635525918"} {:id "defn-/wildcard-pattern?", :kind "defn-", :line 453, :end-line 455, :hash "76497133"} {:id "defn-/record-pattern-form?", :kind "defn-", :line 457, :end-line 459, :hash "-1394925114"} {:id "defn-/union-pattern-form?", :kind "defn-", :line 461, :end-line 463, :hash "765247313"} {:id "defn-/parse-literal-pattern", :kind "defn-", :line 465, :end-line 468, :hash "148576341"} {:id "defn-/parse-wildcard-pattern", :kind "defn-", :line 470, :end-line 472, :hash "688434532"} {:id "defn-/parse-binder-pattern", :kind "defn-", :line 474, :end-line 477, :hash "-1102720389"} {:id "defn-/parse-record-pattern", :kind "defn-", :line 479, :end-line 486, :hash "785832603"} {:id "defn-/parse-union-pattern", :kind "defn-", :line 488, :end-line 492, :hash "1434576212"} {:id "def/pattern-parsers", :kind "def", :line 494, :end-line 499, :hash "1242457034"} {:id "defn/parse-pattern", :kind "defn", :line 501, :end-line 509, :hash "-258633312"} {:id "defn-/parse-union-decl", :kind "defn-", :line 511, :end-line 519, :hash "-1120328440"} {:id "defn-/parse-fn-decl", :kind "defn-", :line 521, :end-line 531, :hash "-1738991000"} {:id "defn-/parse-decl", :kind "defn-", :line 533, :end-line 541, :hash "900166689"} {:id "defn/parse-expr", :kind "defn", :line 543, :end-line 550, :hash "-1140331564"} {:id "defn/parse-module", :kind "defn", :line 552, :end-line 563, :hash "147032411"}]}
+;; {:version 1, :tested-at "2026-03-15T11:31:37.580703-05:00", :module-hash "-165067260", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 5, :hash "-705971706"} {:id "form/1/declare", :kind "declare", :line 7, :end-line 7, :hash "1128659220"} {:id "form/2/declare", :kind "declare", :line 8, :end-line 8, :hash "-1446383543"} {:id "defn-/fail!", :kind "defn-", :line 10, :end-line 12, :hash "444631387"} {:id "defn-/reader-location", :kind "defn-", :line 14, :end-line 18, :hash "480682887"} {:id "defn-/reader-diagnostic", :kind "defn-", :line 20, :end-line 38, :hash "254148700"} {:id "defn-/read-source-form", :kind "defn-", :line 40, :end-line 48, :hash "857693789"} {:id "defn-/expect-seq-form", :kind "defn-", :line 50, :end-line 56, :hash "1060748871"} {:id "defn-/expect-count", :kind "defn-", :line 58, :end-line 64, :hash "1975585924"} {:id "defn-/expect-at-least", :kind "defn-", :line 66, :end-line 72, :hash "1949113360"} {:id "defn-/parse-import", :kind "defn-", :line 74, :end-line 87, :hash "-1464173778"} {:id "defn-/expect-tag", :kind "defn-", :line 89, :end-line 96, :hash "158154506"} {:id "defn-/parse-imports", :kind "defn-", :line 98, :end-line 101, :hash "2124099339"} {:id "defn-/parse-exports", :kind "defn-", :line 103, :end-line 106, :hash "987718804"} {:id "defn-/parse-host", :kind "defn-", :line 108, :end-line 115, :hash "-1723731476"} {:id "defn-/parse-param", :kind "defn-", :line 117, :end-line 120, :hash "949945736"} {:id "defn-/parse-field", :kind "defn-", :line 122, :end-line 126, :hash "1251715611"} {:id "defn-/parse-effects", :kind "defn-", :line 128, :end-line 143, :hash "2129032603"} {:id "defn-/parse-contract-clause", :kind "defn-", :line 145, :end-line 148, :hash "2065410627"} {:id "defn-/parse-invariants", :kind "defn-", :line 150, :end-line 155, :hash "192681247"} {:id "defn-/parse-type-params", :kind "defn-", :line 157, :end-line 162, :hash "-1233585086"} {:id "defn-/parse-data-decl", :kind "defn-", :line 164, :end-line 172, :hash "240075906"} {:id "defn-/parse-enum-decl", :kind "defn-", :line 174, :end-line 178, :hash "53471563"} {:id "defn-/parse-variant-decl", :kind "defn-", :line 180, :end-line 184, :hash "545649087"} {:id "defn-/parse-case", :kind "defn-", :line 186, :end-line 190, :hash "505569259"} {:id "defn-/parse-call-expr", :kind "defn-", :line 192, :end-line 196, :hash "1364196914"} {:id "defn-/parse-construct-expr", :kind "defn-", :line 198, :end-line 202, :hash "587366883"} {:id "defn-/parse-variant-expr", :kind "defn-", :line 204, :end-line 209, :hash "-385235348"} {:id "defn-/parse-record-get-expr", :kind "defn-", :line 211, :end-line 215, :hash "1628847814"} {:id "defn-/parse-if-expr", :kind "defn-", :line 217, :end-line 222, :hash "-1106654283"} {:id "defn-/parse-match-expr", :kind "defn-", :line 224, :end-line 228, :hash "1800281827"} {:id "defn-/parse-binding", :kind "defn-", :line 230, :end-line 233, :hash "-1959265528"} {:id "defn-/parse-let-expr", :kind "defn-", :line 235, :end-line 239, :hash "-647963169"} {:id "defn-/parse-seq-expr", :kind "defn-", :line 241, :end-line 244, :hash "302220611"} {:id "defn-/parse-lambda-expr", :kind "defn-", :line 246, :end-line 254, :hash "217255988"} {:id "defn-/parse-catch-clause", :kind "defn-", :line 256, :end-line 261, :hash "1820817090"} {:id "defn-/parse-finally-clause", :kind "defn-", :line 263, :end-line 266, :hash "-378492021"} {:id "defn-/parse-try-expr", :kind "defn-", :line 268, :end-line 277, :hash "716102796"} {:id "defn-/parse-var-expr", :kind "defn-", :line 279, :end-line 284, :hash "1325393821"} {:id "defn-/parse-set-expr", :kind "defn-", :line 286, :end-line 290, :hash "1429713983"} {:id "defn-/parse-loop-expr", :kind "defn-", :line 292, :end-line 296, :hash "-198693472"} {:id "defn-/parse-recur-expr", :kind "defn-", :line 298, :end-line 301, :hash "-1009172251"} {:id "defn-/parse-raise-expr", :kind "defn-", :line 303, :end-line 306, :hash "-1091784450"} {:id "defn-/parse-primitive-unary-expr", :kind "defn-", :line 308, :end-line 311, :hash "1155615128"} {:id "defn-/parse-primitive-binary-expr", :kind "defn-", :line 313, :end-line 316, :hash "-981498976"} {:id "defn-/parse-io-read-line-expr", :kind "defn-", :line 318, :end-line 320, :hash "1866185537"} {:id "defn-/parse-io-print-expr", :kind "defn-", :line 322, :end-line 325, :hash "2139111722"} {:id "defn-/parse-io-println-expr", :kind "defn-", :line 327, :end-line 330, :hash "-369802684"} {:id "defn-/parse-string-split-on-expr", :kind "defn-", :line 332, :end-line 335, :hash "-549703719"} {:id "defn-/parse-seq-get-expr", :kind "defn-", :line 337, :end-line 340, :hash "683923185"} {:id "defn-/parse-map-empty-expr", :kind "defn-", :line 342, :end-line 345, :hash "-922121204"} {:id "defn-/parse-string-substring-expr", :kind "defn-", :line 347, :end-line 350, :hash "-2136231073"} {:id "defn-/parse-type-args", :kind "defn-", :line 352, :end-line 355, :hash "-266637052"} {:id "defn-/parse-signature", :kind "defn-", :line 357, :end-line 361, :hash "804347329"} {:id "defn-/parse-java-new-expr", :kind "defn-", :line 363, :end-line 374, :hash "-1667842733"} {:id "defn-/parse-java-call-expr", :kind "defn-", :line 376, :end-line 382, :hash "-1542269505"} {:id "defn-/parse-java-static-call-expr", :kind "defn-", :line 384, :end-line 390, :hash "1075951034"} {:id "defn-/parse-java-get-field-expr", :kind "defn-", :line 392, :end-line 397, :hash "1853237465"} {:id "defn-/parse-java-static-get-field-expr", :kind "defn-", :line 399, :end-line 404, :hash "-1799498212"} {:id "defn-/parse-java-set-field-expr", :kind "defn-", :line 406, :end-line 412, :hash "-2021484420"} {:id "defn-/parse-java-static-set-field-expr", :kind "defn-", :line 414, :end-line 420, :hash "-1416091135"} {:id "def/expr-handlers", :kind "def", :line 422, :end-line 512, :hash "868747352"} {:id "defn-/literal-pattern?", :kind "defn-", :line 514, :end-line 519, :hash "635525918"} {:id "defn-/wildcard-pattern?", :kind "defn-", :line 521, :end-line 523, :hash "76497133"} {:id "defn-/record-pattern-form?", :kind "defn-", :line 525, :end-line 527, :hash "-1394925114"} {:id "defn-/union-pattern-form?", :kind "defn-", :line 529, :end-line 531, :hash "765247313"} {:id "defn-/parse-literal-pattern", :kind "defn-", :line 533, :end-line 536, :hash "148576341"} {:id "defn-/parse-wildcard-pattern", :kind "defn-", :line 538, :end-line 540, :hash "688434532"} {:id "defn-/parse-binder-pattern", :kind "defn-", :line 542, :end-line 545, :hash "-1102720389"} {:id "defn-/parse-record-pattern", :kind "defn-", :line 547, :end-line 554, :hash "785832603"} {:id "defn-/parse-union-pattern", :kind "defn-", :line 556, :end-line 560, :hash "1434576212"} {:id "def/pattern-parsers", :kind "def", :line 562, :end-line 567, :hash "1242457034"} {:id "defn/parse-pattern", :kind "defn", :line 569, :end-line 577, :hash "-258633312"} {:id "defn-/parse-union-decl", :kind "defn-", :line 579, :end-line 587, :hash "-1120328440"} {:id "defn-/parse-fn-decl", :kind "defn-", :line 589, :end-line 611, :hash "2092807272"} {:id "defn-/parse-decl", :kind "defn-", :line 613, :end-line 621, :hash "900166689"} {:id "defn/parse-expr", :kind "defn", :line 623, :end-line 630, :hash "-1140331564"} {:id "defn/parse-module", :kind "defn", :line 632, :end-line 657, :hash "1884068889"}]}
 ;; clj-mutate-manifest-end
