@@ -1,0 +1,162 @@
+(module example/thermostat_test_suite
+  (imports
+    (airj airj/test TestOutcome
+                          fail
+                          assert-bool-eq
+                          assert-contract-message
+                          assert-int-eq
+                          assert-string-eq)
+    (java java.lang.IllegalStateException)
+    (airj example/thermostat Controller
+                              cool-step
+                              heat-step
+                              make-controller
+                              mode
+                              set-target
+                              stable?))
+  (export suite)
+
+  (fn creates-controller
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-int-eq)
+          "creates controller"
+          (record-get (call (local make-controller) 20 25) current)
+          20))
+
+  (fn updates-target
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-int-eq)
+          "updates target"
+          (record-get
+            (call (local set-target)
+                  (call (local make-controller) 20 25)
+                  30)
+            target)
+          30))
+
+  (fn heats-upward
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-int-eq)
+          "heats upward"
+          (record-get
+            (call (local heat-step)
+                  (call (local make-controller) 20 25))
+            current)
+          21))
+
+  (fn cools-downward
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-int-eq)
+          "cools downward"
+          (record-get
+            (call (local cool-step)
+                  (call (local make-controller) 30 25))
+            current)
+          29))
+
+  (fn reports-heating-mode
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-string-eq)
+          "reports heating mode"
+          (call (local mode)
+                (call (local make-controller) 20 25))
+          "heating"))
+
+  (fn reports-stable
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-bool-eq)
+          "reports stable"
+          (call (local stable?)
+                (call (local make-controller) 25 25))
+          true))
+
+  (fn rejects-invalid-target
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (try
+      (seq
+        (call (local set-target)
+              (call (local make-controller) 20 25)
+              101)
+        (call (local fail)
+              "rejects invalid target"
+              "Expected contract failure."
+              "set-target accepted an out-of-range target."))
+      (catch (Java java.lang.IllegalStateException) ex
+        (call (local assert-contract-message)
+              "rejects invalid target"
+              (java/call (local ex) getMessage (signature () String))
+              "Precondition"
+              "set-target"))))
+
+  (fn rejects-useless-heat-step
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (try
+      (seq
+        (call (local heat-step)
+              (call (local make-controller) 25 25))
+        (call (local fail)
+              "rejects useless heat step"
+              "Expected contract failure."
+              "heat-step accepted an already stable controller."))
+      (catch (Java java.lang.IllegalStateException) ex
+        (call (local assert-contract-message)
+              "rejects useless heat step"
+              (java/call (local ex) getMessage (signature () String))
+              "Precondition"
+              "heat-step"))))
+
+  (fn suite
+    (params)
+    (returns (Seq TestOutcome))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (seq-append
+      (seq-append
+        (seq-append
+          (seq-append
+            (seq-append
+              (seq-append
+                (seq-append
+                  (seq-append
+                    (seq-empty TestOutcome)
+                    (call (local creates-controller)))
+                  (call (local updates-target)))
+                (call (local heats-upward)))
+              (call (local cools-downward)))
+            (call (local reports-heating-mode)))
+          (call (local reports-stable)))
+        (call (local rejects-invalid-target)))
+      (call (local rejects-useless-heat-step)))))

@@ -41,10 +41,12 @@ clj -M -m airj.cli build --project-dir examples/Ledger --jar /tmp/ledger-tests-j
 java -jar /tmp/ledger-tests-json.jar
 ```
 
-The suite focuses on contract-preserving success paths:
+The suite covers both contract-preserving success paths and explicit contract failures:
 
 - opening a valid account at zero
 - positive deposits and bounded withdrawals
 - transfer preserving total funds
 - transfer updating both accounts exactly
 - stable balance labels for reporting
+- rejecting empty account ids
+- rejecting overdrafts

@@ -9,7 +9,7 @@
   (fn tests
     (params)
     (returns (Seq TestOutcome))
-    (effects ())
+    (effects (Foreign.Throw))
     (requires true)
     (ensures true)
     (call (local suite)))
@@ -17,7 +17,7 @@
   (fn main
     (params (args StringSeq))
     (returns Int)
-    (effects (Stdout.Write))
+    (effects (Stdout.Write Foreign.Throw))
     (requires true)
     (ensures true)
     (call (local run-json)

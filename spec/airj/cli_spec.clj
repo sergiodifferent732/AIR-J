@@ -435,7 +435,7 @@
         (sut/run ["run" "--project-sources-edn" (.getPath sources-file) "example/use"] "ignored")
         (should false)
         (catch java.lang.reflect.InvocationTargetException e
-          (should= "Invariant failed: Counter"
+          (should= "Contract failed: kind=Invariant, target=Counter"
                    (.getMessage (.getTargetException e)))))
       (.delete sources-file)))
 
@@ -627,7 +627,7 @@
         (sut/run ["run" "--project-dir" project-dir "example/use"] "ignored")
         (should false)
         (catch java.lang.reflect.InvocationTargetException e
-          (should= "Invariant failed: Counter"
+          (should= "Contract failed: kind=Invariant, target=Counter"
                    (.getMessage (.getTargetException e)))))))
 
   (it "adds project command context to missing-module failures from a project directory"

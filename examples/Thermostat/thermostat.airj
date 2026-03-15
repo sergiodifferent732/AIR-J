@@ -1,0 +1,121 @@
+(module example/thermostat
+  (imports)
+  (export Controller
+          make-controller
+          set-target
+          heat-step
+          cool-step
+          mode
+          stable?)
+
+  (data Controller
+    (invariants
+      (bool-and
+        (bool-and
+          (int-ge (local current) 0)
+          (int-le (local current) 100))
+        (bool-and
+          (int-ge (local target) 0)
+          (int-le (local target) 100))))
+    (field current Int)
+    (field target Int))
+
+  (fn make-controller
+    (params (current Int) (target Int))
+    (returns Controller)
+    (effects ())
+    (requires
+      (bool-and
+        (bool-and
+          (int-ge (local current) 0)
+          (int-le (local current) 100))
+        (bool-and
+          (int-ge (local target) 0)
+          (int-le (local target) 100))))
+    (ensures
+      (bool-and
+        (int-eq (record-get (local __airj_result) current) (local current))
+        (int-eq (record-get (local __airj_result) target) (local target))))
+    (construct Controller (local current) (local target)))
+
+  (fn set-target
+    (params (controller Controller) (target Int))
+    (returns Controller)
+    (effects ())
+    (requires
+      (bool-and
+        (int-ge (local target) 0)
+        (int-le (local target) 100)))
+    (ensures
+      (bool-and
+        (int-eq (record-get (local __airj_result) current)
+                (record-get (local controller) current))
+        (int-eq (record-get (local __airj_result) target)
+                (local target))))
+    (construct Controller
+               (record-get (local controller) current)
+               (local target)))
+
+  (fn heat-step
+    (params (controller Controller))
+    (returns Controller)
+    (effects ())
+    (requires
+      (bool-and
+        (int-lt (record-get (local controller) current)
+                (record-get (local controller) target))
+        (int-lt (record-get (local controller) current) 100)))
+    (ensures
+      (bool-and
+        (int-eq (record-get (local __airj_result) current)
+                (int-add (record-get (local controller) current) 1))
+        (int-eq (record-get (local __airj_result) target)
+                (record-get (local controller) target))))
+    (construct Controller
+               (int-add (record-get (local controller) current) 1)
+               (record-get (local controller) target)))
+
+  (fn cool-step
+    (params (controller Controller))
+    (returns Controller)
+    (effects ())
+    (requires
+      (bool-and
+        (int-gt (record-get (local controller) current)
+                (record-get (local controller) target))
+        (int-gt (record-get (local controller) current) 0)))
+    (ensures
+      (bool-and
+        (int-eq (record-get (local __airj_result) current)
+                (int-sub (record-get (local controller) current) 1))
+        (int-eq (record-get (local __airj_result) target)
+                (record-get (local controller) target))))
+    (construct Controller
+               (int-sub (record-get (local controller) current) 1)
+               (record-get (local controller) target)))
+
+  (fn mode
+    (params (controller Controller))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if
+      (int-lt (record-get (local controller) current)
+              (record-get (local controller) target))
+      "heating"
+      (if
+        (int-gt (record-get (local controller) current)
+                (record-get (local controller) target))
+        "cooling"
+        "idle")))
+
+  (fn stable?
+    (params (controller Controller))
+    (returns Bool)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (int-eq
+      (record-get (local controller) current)
+      (record-get (local controller) target))))

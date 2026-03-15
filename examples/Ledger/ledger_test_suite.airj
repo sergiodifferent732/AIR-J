@@ -1,8 +1,11 @@
 (module example/ledger_test_suite
   (imports
     (airj airj/test TestOutcome
+                          fail
+                          assert-contract-message
                           assert-int-eq
                           assert-string-eq)
+    (java java.lang.IllegalStateException)
     (airj example/ledger balance-label
                           deposit
                           open-account
@@ -112,10 +115,54 @@
                       6))
           "alice:6"))
 
+  (fn rejects-empty-account-id
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (try
+      (seq
+        (call (local open-account) "")
+        (call (local fail)
+              "rejects empty account id"
+              "Expected contract failure."
+              "open-account accepted an empty id."))
+      (catch (Java java.lang.IllegalStateException) ex
+        (call (local assert-contract-message)
+              "rejects empty account id"
+              (java/call (local ex) getMessage (signature () String))
+              "Precondition"
+              "open-account"))))
+
+  (fn rejects-overdraft
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (try
+      (seq
+        (call (local withdraw)
+              (call (local deposit)
+                    (call (local open-account) "alice")
+                    3)
+              4)
+        (call (local fail)
+              "rejects overdraft"
+              "Expected contract failure."
+              "withdraw accepted an overdraft."))
+      (catch (Java java.lang.IllegalStateException) ex
+        (call (local assert-contract-message)
+              "rejects overdraft"
+              (java/call (local ex) getMessage (signature () String))
+              "Precondition"
+              "withdraw"))))
+
   (fn suite
     (params)
     (returns (Seq TestOutcome))
-    (effects ())
+    (effects (Foreign.Throw))
     (requires true)
     (ensures true)
     (seq-append
@@ -124,10 +171,14 @@
           (seq-append
             (seq-append
               (seq-append
-                (seq-empty TestOutcome)
-                (call (local opens-at-zero)))
-              (call (local deposits-positive-amount)))
-            (call (local withdraws-within-balance)))
-          (call (local transfer-preserves-total)))
-        (call (local transfer-updates-both-sides)))
-      (call (local labels-balance)))))
+                (seq-append
+                  (seq-append
+                    (seq-empty TestOutcome)
+                    (call (local opens-at-zero)))
+                  (call (local deposits-positive-amount)))
+                (call (local withdraws-within-balance)))
+              (call (local transfer-preserves-total)))
+            (call (local transfer-updates-both-sides)))
+          (call (local labels-balance)))
+        (call (local rejects-empty-account-id)))
+      (call (local rejects-overdraft)))))

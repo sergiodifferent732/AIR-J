@@ -1325,7 +1325,7 @@
         (should false)
         (catch java.lang.reflect.InvocationTargetException e
           (should (instance? IllegalStateException (.getCause e)))
-          (should= "Precondition failed: main"
+          (should= "Contract failed: kind=Precondition, target=main"
                    (.getMessage (.getCause e)))))))
 
   (it "enforces failing postconditions at runtime"
@@ -1344,7 +1344,7 @@
         (should false)
         (catch java.lang.reflect.InvocationTargetException e
           (should (instance? IllegalStateException (.getCause e)))
-          (should= "Postcondition failed: main"
+          (should= "Contract failed: kind=Postcondition, target=main"
                    (.getMessage (.getCause e)))))))
 
   (it "evaluates arithmetic preconditions and postconditions at runtime"
@@ -1400,7 +1400,7 @@
         (should false)
         (catch java.lang.reflect.InvocationTargetException e
           (should (instance? IllegalStateException (.getCause e)))
-          (should= "Precondition failed: add-safe"
+          (should= "Contract failed: kind=Precondition, target=add-safe"
                    (.getMessage (.getCause e)))))))
 
   (it "rejects failing arithmetic postconditions at runtime"
@@ -1428,7 +1428,7 @@
         (should false)
         (catch java.lang.reflect.InvocationTargetException e
           (should (instance? IllegalStateException (.getCause e)))
-          (should= "Postcondition failed: add-bad"
+          (should= "Contract failed: kind=Postcondition, target=add-bad"
                    (.getMessage (.getCause e)))))))
 
   (it "enforces failing data invariants at runtime when constructing values"
@@ -1451,7 +1451,7 @@
         (should false)
         (catch java.lang.reflect.InvocationTargetException e
           (should (instance? IllegalStateException (.getCause e)))
-          (should= "Invariant failed: Counter"
+          (should= "Contract failed: kind=Invariant, target=Counter"
                    (.getMessage (.getCause e)))))))
 
   (it "enforces failing union invariants at runtime when constructing variants"
@@ -1481,7 +1481,7 @@
         (should false)
         (catch java.lang.reflect.InvocationTargetException e
           (should (instance? IllegalStateException (.getCause e)))
-          (should= "Invariant failed: Response"
+          (should= "Contract failed: kind=Invariant, target=Response"
                    (.getMessage (.getCause e)))))))
 
   (it "rejects constructing imported AIR-J data types from interface-only imports"
@@ -1542,7 +1542,7 @@
         (should false)
         (catch java.lang.reflect.InvocationTargetException e
           (should (instance? IllegalStateException (.getCause e)))
-          (should= "Invariant failed: Counter"
+          (should= "Contract failed: kind=Invariant, target=Counter"
                    (.getMessage (.getCause e)))))))
 
   (it "rejects running modules without an exported AIR-J main"
@@ -1846,3 +1846,62 @@
       (should= 0 (:exit report-result))
       (should= "" (:err report-result))
       (should= "7\n" (:out report-result))))
+
+  (it "runs AIR-J contract-message assertions inside a compiled program"
+    (let [source "(module example/contract_assertion
+                    (imports
+                      (airj airj/test TestOutcome assert-contract-message)
+                      (java java.lang.IllegalStateException))
+                    (export main)
+                    (fn main
+                      (params)
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (match
+                        (try
+                          (raise
+                            (java/new java.lang.IllegalStateException
+                                      \"Contract failed: kind=Precondition, target=demo\"))
+                          (catch (Java java.lang.IllegalStateException) ex
+                            (call (local assert-contract-message)
+                                  \"contract message\"
+                                  (java/call (local ex) getMessage (signature () String))
+                                  \"Precondition\"
+                                  \"demo\")))
+                        (case (Pass _)
+                          1)
+                        (case _
+                          0))))"]
+      (should= 1 (sut/run-source! source []))))
+
+  (it "runs AIR-J diagnostic-detail assertions inside a compiled program"
+    (let [source "(module example/diagnostic_detail_assertion
+                    (imports
+                      (airj airj/file read-string-result)
+                      (airj airj/test TestOutcome assert-diagnostic-detail fail))
+                    (export main)
+                    (fn main
+                      (params)
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (match
+                        (match (call (local read-string-result) \"/definitely/missing/airj-file.txt\")
+                          (case (Err diagnostic)
+                            (call (local assert-diagnostic-detail)
+                                  \"diagnostic detail\"
+                                  (local diagnostic)
+                                  \"/definitely/missing/airj-file.txt\"))
+                          (case _
+                            (call (local fail)
+                                  \"diagnostic detail\"
+                                  \"Expected file read failure.\"
+                                  \"read-string-result returned Ok.\")))
+                        (case (Pass _)
+                          1)
+                        (case _
+                          0))))"]
+      (should= 1 (sut/run-source! source []))))

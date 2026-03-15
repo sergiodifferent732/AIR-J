@@ -1,8 +1,8 @@
-(module example/ledger_tests_root
+(module example/thermostat_tests_json
   (imports
     (airj airj/test TestOutcome)
-    (airj airj/test-runner run)
-    (airj example/ledger_test_suite suite))
+    (airj airj/test-runner run-json)
+    (airj example/thermostat_test_suite suite))
   (export tests
           main)
 
@@ -20,4 +20,6 @@
     (effects (Stdout.Write Foreign.Throw))
     (requires true)
     (ensures true)
-    (call (local run) (call (local tests)))))
+    (call (local run-json)
+          "example/thermostat_tests_json"
+          (call (local tests)))))

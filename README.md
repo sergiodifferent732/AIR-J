@@ -114,6 +114,7 @@ See [`examples/HTW/README.md`](/Users/unclebob/projects/AIR-J/examples/HTW/READM
 See [`examples/ToolWorkflow/README.md`](/Users/unclebob/projects/AIR-J/examples/ToolWorkflow/README.md) for a non-game example that emits and then consumes the canonical JSON test artifact.
 See [`examples/Contracts/README.md`](/Users/unclebob/projects/AIR-J/examples/Contracts/README.md) for a contract-heavy example that uses invariants plus `requires`/`ensures`.
 See [`examples/Ledger/README.md`](/Users/unclebob/projects/AIR-J/examples/Ledger/README.md) for a contract-heavy ledger example with explicit text and JSON test roots.
+See [`examples/Thermostat/README.md`](/Users/unclebob/projects/AIR-J/examples/Thermostat/README.md) for a non-financial safety-controller example with contract failure tests.
 
 ## Development Workflow
 

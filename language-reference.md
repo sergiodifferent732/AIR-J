@@ -206,6 +206,7 @@ Current implementation support:
 - `ensures` clauses may reference `__airj_result` as the function result value
 - `requires` clauses may reference parameters and imported pure functions
 - `invariants` may reference the declaration contract scope described in the formal spec
+- runtime contract failures currently raise `IllegalStateException` with the stable format `Contract failed: kind=<Kind>, target=<Name>`
 
 ## Expressions
 

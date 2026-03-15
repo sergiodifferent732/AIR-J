@@ -225,6 +225,8 @@
               assert-int-eq
               assert-string-eq
               assert-diagnostic-message
+              assert-diagnostic-detail
+              assert-contract-message
               assert-interchange-string-field
               assert-none-string
               assert-some-string
@@ -359,6 +361,28 @@
               (local name)
               (record-get (local actual) message)
               (local expected)))
+      (fn assert-diagnostic-detail
+        (params (name String) (actual Diagnostic) (expected String))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (call (local assert-string-eq)
+              (local name)
+              (record-get (local actual) detail)
+              (local expected)))
+      (fn assert-contract-message
+        (params (name String) (actual String) (kind String) (target String))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (call (local assert-string-eq)
+              (local name)
+              (local actual)
+              (string-concat
+                (string-concat \"Contract failed: kind=\" (local kind))
+                (string-concat \", target=\" (local target)))))
       (fn assert-interchange-string-field
         (params (name String) (payload Interchange) (field String) (expected String))
         (returns TestOutcome)
@@ -1017,5 +1041,5 @@
       seen)))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-15T14:39:15.260935-05:00", :module-hash "-81485556", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 978, :hash "-1544073402"} {:id "defn/source-map", :kind "defn", :line 980, :end-line 982, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 984, :end-line 986, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 988, :end-line 990, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 992, :end-line 994, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 996, :end-line 1002, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 1004, :end-line 1017, :hash "-1038087388"}]}
+;; {:version 1, :tested-at "2026-03-15T15:58:10.977011-05:00", :module-hash "-1819914036", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 1002, :hash "474291654"} {:id "defn/source-map", :kind "defn", :line 1004, :end-line 1006, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 1008, :end-line 1010, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 1012, :end-line 1014, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 1016, :end-line 1018, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 1020, :end-line 1026, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 1028, :end-line 1041, :hash "-1038087388"}]}
 ;; clj-mutate-manifest-end
