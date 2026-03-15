@@ -410,16 +410,24 @@
    'airj/test-runner
    "(module airj/test-runner
       (imports
-        (airj airj/core Diagnostic)
+        (airj airj/core Diagnostic Interchange Result)
+        (airj airj/json write-result)
         (airj airj/test TestOutcome TestSummary))
       (export empty-summary
               record
               summarize
               run
+              run-json
               failure-count
               exit-code
+              diagnostic-interchange
+              outcome-interchange
+              outcomes-interchange
+              summary-interchange
+              render-json-summary
               render-outcome
               render-summary
+              print-json-summary
               print-summary)
       (fn empty-summary
         (params)
@@ -485,6 +493,16 @@
           (seq
             (call (local print-summary) (local summary))
             (call (local exit-code) (local summary)))))
+      (fn run-json
+        (params (module-name String) (outcomes (Seq TestOutcome)))
+        (returns Int)
+        (effects (Stdout.Write))
+        (requires true)
+        (ensures true)
+        (let ((summary (call (local summarize) (local outcomes))))
+          (seq
+            (call (local print-json-summary) (local module-name) (local summary))
+            (call (local exit-code) (local summary)))))
       (fn failure-count
         (params (summary TestSummary))
         (returns Int)
@@ -504,6 +522,122 @@
           (int-eq (call (local failure-count) (local summary)) 0)
           0
           1))
+      (fn diagnostic-interchange
+        (params (diagnostic Diagnostic))
+        (returns Interchange)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (variant Interchange
+                 MapValue
+                 (map-set
+                   (map-set
+                     (map-set
+                       (map-empty Interchange)
+                       \"phase\"
+                       (variant Interchange StringValue (record-get (local diagnostic) phase)))
+                     \"message\"
+                     (variant Interchange StringValue (record-get (local diagnostic) message)))
+                   \"detail\"
+                   (variant Interchange StringValue (record-get (local diagnostic) detail)))))
+      (fn outcome-interchange
+        (params (outcome TestOutcome))
+        (returns Interchange)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (match (local outcome)
+          (case (Pass name)
+            (variant Interchange
+                     MapValue
+                     (map-set
+                       (map-set
+                         (map-empty Interchange)
+                         \"status\"
+                         (variant Interchange StringValue \"pass\"))
+                       \"name\"
+                       (variant Interchange StringValue (local name)))))
+          (case (Fail name diagnostic)
+            (variant Interchange
+                     MapValue
+                     (map-set
+                       (map-set
+                         (map-set
+                           (map-empty Interchange)
+                           \"status\"
+                           (variant Interchange StringValue \"fail\"))
+                         \"name\"
+                         (variant Interchange StringValue (local name)))
+                       \"diagnostic\"
+                       (call (local diagnostic-interchange) (local diagnostic)))))
+          (case (Error name diagnostic)
+            (variant Interchange
+                     MapValue
+                     (map-set
+                       (map-set
+                         (map-set
+                           (map-empty Interchange)
+                           \"status\"
+                           (variant Interchange StringValue \"error\"))
+                         \"name\"
+                         (variant Interchange StringValue (local name)))
+                       \"diagnostic\"
+                       (call (local diagnostic-interchange) (local diagnostic)))))))
+      (fn outcomes-interchange
+        (params (outcomes (Seq TestOutcome)))
+        (returns Interchange)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (loop ((remaining (local outcomes))
+               (values (seq-empty Interchange)))
+          (if
+            (seq-empty? (local remaining))
+            (variant Interchange SeqValue (local values))
+            (recur (seq-rest (local remaining))
+                   (seq-append (local values)
+                               (call (local outcome-interchange)
+                                     (seq-first (local remaining))))))))
+      (fn summary-interchange
+        (params (module-name String) (summary TestSummary))
+        (returns Interchange)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (variant Interchange
+                 MapValue
+                 (map-set
+                   (map-set
+                     (map-set
+                       (map-set
+                         (map-set
+                           (map-empty Interchange)
+                           \"module\"
+                           (variant Interchange StringValue (local module-name)))
+                         \"passed\"
+                         (variant Interchange IntValue (record-get (local summary) passed)))
+                       \"failed\"
+                       (variant Interchange IntValue (record-get (local summary) failed)))
+                     \"errored\"
+                     (variant Interchange IntValue (record-get (local summary) errored)))
+                   \"outcomes\"
+                   (call (local outcomes-interchange) (record-get (local summary) outcomes)))))
+      (fn render-json-summary
+        (params (module-name String) (summary TestSummary))
+        (returns String)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (match (call (local write-result)
+                     (call (local summary-interchange) (local module-name) (local summary)))
+          (case (Ok text)
+            (local text))
+          (case (Err diagnostic)
+            (string-concat
+              (string-concat
+                \"{\\\"message\\\":\\\"\"
+                (record-get (local diagnostic) message))
+              \"\\\"}\"))))
       (fn render-outcome
         (params (outcome TestOutcome))
         (returns String)
@@ -555,7 +689,14 @@
             (io/println (call (local render-summary) (local summary)))
             (seq
               (io/println (call (local render-outcome) (seq-first (local remaining))))
-              (recur (seq-rest (local remaining)))))))))"
+              (recur (seq-rest (local remaining)))))))
+      (fn print-json-summary
+        (params (module-name String) (summary TestSummary))
+        (returns Unit)
+        (effects (Stdout.Write))
+        (requires true)
+        (ensures true)
+        (io/println (call (local render-json-summary) (local module-name) (local summary))))))"
 
    'airj/file
    "(module airj/file
@@ -833,5 +974,5 @@
       seen)))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-15T13:16:04.801346-05:00", :module-hash "-696674536", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 794, :hash "-1442247769"} {:id "defn/source-map", :kind "defn", :line 796, :end-line 798, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 800, :end-line 802, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 804, :end-line 806, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 808, :end-line 810, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 812, :end-line 818, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 820, :end-line 833, :hash "-1038087388"}]}
+;; {:version 1, :tested-at "2026-03-15T13:59:41.206512-05:00", :module-hash "-998039653", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 935, :hash "-1695943113"} {:id "defn/source-map", :kind "defn", :line 937, :end-line 939, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 941, :end-line 943, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 945, :end-line 947, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 949, :end-line 951, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 953, :end-line 959, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 961, :end-line 974, :hash "-1038087388"}]}
 ;; clj-mutate-manifest-end

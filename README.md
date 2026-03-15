@@ -98,10 +98,11 @@ These modules exist to reduce representation drift. They are the default machine
 ## AIR-J Tests
 
 The canonical AIR-J test shape is:
-- a module exports a zero-arg `tests` function returning `(Seq TestOutcome)`
-- `main` delegates to `airj/test-runner.run`
-- the resulting module can be built and run like any other AIR-J jar
-- bootstrap CLI testing expects that exact module shape; individual exported test functions are not a second supported style
+- reusable suite modules export uniquely named suite functions
+- explicit runnable test-root modules export a zero-arg `tests` function returning `(Seq TestOutcome)`
+- root `main` delegates to `airj/test-runner.run` or `airj/test-runner.run-json`
+- the resulting root module can be built and run like any other AIR-J jar
+- bootstrap CLI testing expects that exact root-module shape; individual exported test functions are not a second supported style
 - `clj -M -m airj.cli test --json ...` returns one canonical summary artifact with:
   - `module`
   - `passed`

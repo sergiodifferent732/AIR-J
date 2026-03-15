@@ -423,6 +423,13 @@ AIR-J-native test execution helpers:
 - `record`
 - `summarize`
 - `run`
+- `run-json`
+- `diagnostic-interchange`
+- `outcome-interchange`
+- `outcomes-interchange`
+- `summary-interchange`
+- `render-json-summary`
+- `print-json-summary`
 - `failure-count`
 - `exit-code`
 - `render-outcome`
@@ -431,22 +438,24 @@ AIR-J-native test execution helpers:
 
 ## Canonical Test Modules
 
-AIR-J test modules should use one canonical shape:
-- import `airj/test` for `TestOutcome` and assertions
-- export a zero-arg `tests` function returning `(Seq TestOutcome)`
-- implement `main` as a direct call to `airj/test-runner.run`
-- the bootstrap CLI `test` command expects exactly that shape
+AIR-J test code should use one canonical project shape:
+- reusable suite modules export uniquely named suite functions returning `(Seq TestOutcome)`
+- runnable test-root modules import those suite functions
+- runnable test-root modules export:
+  - a zero-arg `tests` function returning `(Seq TestOutcome)`
+  - `main : (StringSeq) -> Int`
+- root `main` is a direct call to `airj/test-runner.run` or `airj/test-runner.run-json`
+- the bootstrap CLI `test` command expects exactly that runnable root-module shape
 - exporting individual zero-arg `TestOutcome` functions is not a second supported test-module convention
 
 Example:
 
 ```lisp
-(module example/tests
+(module example/test-suite
   (imports
-    (airj airj/test TestOutcome assert-true)
-    (airj airj/test-runner run))
-  (export tests main)
-  (fn tests
+    (airj airj/test TestOutcome assert-true))
+  (export suite)
+  (fn suite
     (params)
     (returns (Seq TestOutcome))
     (effects ())
@@ -455,6 +464,20 @@ Example:
     (seq-append
       (seq-empty TestOutcome)
       (call (local assert-true) "smoke" true)))
+
+(module example/tests-root
+  (imports
+    (airj airj/test TestOutcome)
+    (airj airj/test-runner run)
+    (airj example/test-suite suite))
+  (export tests main)
+  (fn tests
+    (params)
+    (returns (Seq TestOutcome))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local suite)))
   (fn main
     (params (args StringSeq))
     (returns Int)

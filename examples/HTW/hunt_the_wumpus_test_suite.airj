@@ -1,4 +1,4 @@
-(module example/hunt_the_wumpus_tests
+(module example/hunt_the_wumpus_test_suite
   (imports
     (airj airj/core parse-int)
     (airj airj/test TestOutcome
@@ -9,7 +9,6 @@
                           assert-ok-int
                           assert-some-string
                           assert-string-eq)
-    (airj airj/test-runner run)
     (airj example/wumpus_logic GameState
                                 adjacent?
                                 any-bat-near?
@@ -49,8 +48,7 @@
           command-tests
           warning-tests
           state-tests
-          tests
-          main)
+          suite)
 
   (fn opening-state
     (params)
@@ -392,7 +390,7 @@
         (seq-empty TestOutcome)
         (call (local loses-when-last-arrow-misses)))))
 
-  (fn tests
+  (fn suite
     (params)
     (returns (Seq TestOutcome))
     (effects ())
@@ -402,13 +400,5 @@
       (seq-concat
         (call (local command-tests))
         (call (local warning-tests)))
-      (call (local state-tests))))
-
-  (fn main
-    (params (args StringSeq))
-    (returns Int)
-    (effects (Stdout.Write))
-    (requires true)
-    (ensures true)
-    (call (local run) (call (local tests)))))
+      (call (local state-tests)))))
 )

@@ -1671,3 +1671,54 @@
           exit-code (run-main-process-with-classpath classpath "example.tool" input output)]
       (should= 17 exit-code)
       (should= "{\"tool\":\"ok\"}" (slurp output))))
+
+  (it "builds and runs an AIR-J-native JSON test root"
+    (let [project-dir (.toString (java.nio.file.Files/createTempDirectory "airj-project-tests"
+                                                                          (make-array java.nio.file.attribute.FileAttribute 0)))
+          jar-path (.toString (java.nio.file.Files/createTempFile "airj-project-tests"
+                                                                  ".jar"
+                                                                  (make-array java.nio.file.attribute.FileAttribute 0)))
+          _ (spit (io/file project-dir "suite.airj")
+                  "(module example/test_suite
+                     (imports
+                       (airj airj/test TestOutcome assert-true))
+                     (export suite)
+                     (fn suite
+                       (params)
+                       (returns (Seq TestOutcome))
+                       (effects ())
+                       (requires true)
+                       (ensures true)
+                       (seq-append
+                         (seq-empty TestOutcome)
+                         (call (local assert-true) \"passing\" true))))")
+          _ (spit (io/file project-dir "tests_json.airj")
+                  "(module example/tests_json
+                     (imports
+                       (airj airj/test TestOutcome)
+                       (airj airj/test-runner run-json)
+                       (airj example/test_suite suite))
+                     (export tests main)
+                     (fn tests
+                       (params)
+                       (returns (Seq TestOutcome))
+                       (effects ())
+                       (requires true)
+                       (ensures true)
+                       (call (local suite)))
+                     (fn main
+                       (params (args StringSeq))
+                       (returns Int)
+                       (effects (Stdout.Write))
+                       (requires true)
+                       (ensures true)
+                       (call (local run-json)
+                             \"example/tests_json\"
+                             (call (local tests)))))")
+          _ (sut/build-project-dir-jar! project-dir 'example/tests_json jar-path)
+          result (run-jar-process jar-path "")]
+      (should= 0 (:exit result))
+      (should= "" (:err result))
+      (should-contain "\"module\":\"example/tests_json\"" (:out result))
+      (should-contain "\"passed\":1" (:out result))
+      (should-contain "\"outcomes\":[{\"status\":\"pass\",\"name\":\"passing\"}]" (:out result))))

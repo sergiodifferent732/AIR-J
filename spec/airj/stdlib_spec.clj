@@ -85,5 +85,5 @@
                                        (seq-empty TestOutcome)
                                        (call (local assert-true) \"passing\" true)))))
                          0)))")]
-      (should= #{'airj/core 'airj/test 'airj/test-runner}
+      (should= #{'airj/core 'airj/json 'airj/test 'airj/test-runner}
                (set (keys (sut/reachable-source-map module))))))
