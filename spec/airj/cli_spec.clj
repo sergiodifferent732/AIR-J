@@ -6,6 +6,7 @@
             [airj.parser :as parser]
             [airj.normalizer :as normalizer]
             [airj.resolver :as resolver]
+            [clojure.data.json :as json]
             [speclj.core :refer :all]))
 
 (describe "run"
@@ -43,6 +44,51 @@
     (should-throw clojure.lang.ExceptionInfo
                   "Unsupported command."
                   (sut/run ["compile"] "")))
+
+  (it "runs exported AIR-J tests and renders a human summary"
+    (let [source "(module example/tests
+                    (imports
+                      (airj airj/test TestOutcome assert-true assert-false))
+                    (export passing failing)
+                    (fn passing
+                      (params)
+                      (returns TestOutcome)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (call (local assert-true) \"passing\" true))
+                    (fn failing
+                      (params)
+                      (returns TestOutcome)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (call (local assert-false) \"failing\" true)))"
+          result (sut/run ["test" "--stdin"] source)]
+      (should-contain "PASS passing" result)
+      (should-contain "FAIL failing" result)
+      (should-contain "Summary: 1 passed, 1 failed, 0 errored" result)))
+
+  (it "runs exported AIR-J tests and renders JSON on request"
+    (let [source "(module example/tests
+                    (imports
+                      (airj airj/test TestOutcome assert-true))
+                    (export passing)
+                    (fn passing
+                      (params)
+                      (returns TestOutcome)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (call (local assert-true) \"passing\" true)))"
+          result (sut/run ["test" "--json" "--stdin"] source)
+          parsed (json/read-str result)]
+      (should= {"passed" 1
+                "failed" 0
+                "errored" 0
+                "outcomes" [{"status" "pass"
+                             "name" "passing"}]}
+               parsed)))
 
   (it "renders normalized modules as edn for the normalize command"
     (let [source "(module example/normalize

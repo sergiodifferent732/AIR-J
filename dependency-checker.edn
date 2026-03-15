@@ -1,4 +1,4 @@
-{:allowed-dependencies {:cli [:parser :normalizer :resolver :effect-checker :type-checker :java-resolver :exhaustiveness-checker :jvm-lowerer :compiler]
+{:allowed-dependencies {:cli [:parser :normalizer :resolver :effect-checker :type-checker :java-resolver :exhaustiveness-checker :jvm-lowerer :compiler :test-runner]
                         :compiler [:effect-checker :exhaustiveness-checker :java-resolver :jvm-emitter :jvm-lowerer :linker :module-interface :normalizer :parser :project-files :project-sources :resolver :stdlib :type-checker]
                         :effect-checker [:expr-walker :imported-interfaces :java-effects :java-members :java-types :patterns :type-checker]
                         :exhaustiveness-checker [:expr-walker :imported-interfaces :patterns :type-checker]
@@ -34,6 +34,7 @@
                         :project-files [:project-graph :project-sources]
                         :project-sources [:interface-sources :normalizer :parser :project-graph :stdlib]
                         :stdlib [:interface-sources :parser]
+                        :test-runner [:compiler :parser :project-files]
                         :type-checker [:imported-interfaces :java-types :patterns]
                         :parser []
                         :text-runtime []}

@@ -209,6 +209,141 @@
                                 \"Process execution failed.\"
                                 \"process-run\"))))))"
 
+   'airj/test
+   "(module airj/test
+      (imports
+        (airj airj/core Diagnostic))
+      (export AssertionFailure
+              TestOutcome
+              TestSummary
+              pass
+              fail
+              error
+              assert-true
+              assert-false
+              assert-bool-eq
+              assert-int-eq
+              assert-string-eq)
+      (data AssertionFailure
+        (field expected String)
+        (field actual String))
+      (union TestOutcome
+        (variant Pass
+          (field name String))
+        (variant Fail
+          (field name String)
+          (field diagnostic Diagnostic))
+        (variant Error
+          (field name String)
+          (field diagnostic Diagnostic)))
+      (data TestSummary
+        (field passed Int)
+        (field failed Int)
+        (field errored Int)
+        (field outcomes (Seq TestOutcome)))
+      (fn pass
+        (params (name String))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (variant TestOutcome Pass (local name)))
+      (fn fail
+        (params (name String) (message String) (detail String))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (variant TestOutcome
+                 Fail
+                 (local name)
+                 (construct Diagnostic
+                            \"test\"
+                            (local message)
+                            (local detail))))
+      (fn error
+        (params (name String) (message String) (detail String))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (variant TestOutcome
+                 Error
+                 (local name)
+                 (construct Diagnostic
+                            \"test\"
+                            (local message)
+                            (local detail))))
+      (fn assert-true
+        (params (name String) (actual Bool))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (if
+          (local actual)
+          (call (local pass) (local name))
+          (call (local fail)
+                (local name)
+                \"Expected true.\"
+                \"Assertion evaluated to false.\")))
+      (fn assert-false
+        (params (name String) (actual Bool))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (if
+          (local actual)
+          (call (local fail)
+                (local name)
+                \"Expected false.\"
+                \"Assertion evaluated to true.\")
+          (call (local pass) (local name))))
+      (fn assert-bool-eq
+        (params (name String) (actual Bool) (expected Bool))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (if
+          (bool-eq (local actual) (local expected))
+          (call (local pass) (local name))
+          (call (local fail)
+                (local name)
+                \"Boolean equality assertion failed.\"
+                \"Expected and actual differ.\")))
+      (fn assert-int-eq
+        (params (name String) (actual Int) (expected Int))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (if
+          (int-eq (local actual) (local expected))
+          (call (local pass) (local name))
+          (call (local fail)
+                (local name)
+                \"Integer equality assertion failed.\"
+                (string-concat
+                  (string-concat \"expected=\" (int->string (local expected)))
+                  (string-concat \", actual=\" (int->string (local actual)))))))
+      (fn assert-string-eq
+        (params (name String) (actual String) (expected String))
+        (returns TestOutcome)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (if
+          (string-eq (local actual) (local expected))
+          (call (local pass) (local name))
+          (call (local fail)
+                (local name)
+                \"String equality assertion failed.\"
+                (string-concat
+                  (string-concat \"expected=\" (local expected))
+                  (string-concat \", actual=\" (local actual)))))))"
+
    'airj/file
    "(module airj/file
       (imports
@@ -485,5 +620,5 @@
       seen)))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-14T14:39:58.395194-05:00", :module-hash "-318991637", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 446, :hash "-857012571"} {:id "defn/source-map", :kind "defn", :line 448, :end-line 450, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 452, :end-line 454, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 456, :end-line 458, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 460, :end-line 462, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 464, :end-line 470, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 472, :end-line 485, :hash "-1038087388"}]}
+;; {:version 1, :tested-at "2026-03-15T11:53:09.657455-05:00", :module-hash "1223989292", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 581, :hash "603609246"} {:id "defn/source-map", :kind "defn", :line 583, :end-line 585, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 587, :end-line 589, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 591, :end-line 593, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 595, :end-line 597, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 599, :end-line 605, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 607, :end-line 620, :hash "-1038087388"}]}
 ;; clj-mutate-manifest-end

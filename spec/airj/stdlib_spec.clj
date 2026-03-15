@@ -5,7 +5,7 @@
 
 (describe "stdlib"
   (it "exposes the canonical standard modules"
-    (should= #{'airj/bytes 'airj/core 'airj/env 'airj/file 'airj/json 'airj/process}
+    (should= #{'airj/bytes 'airj/core 'airj/env 'airj/file 'airj/json 'airj/process 'airj/test}
              (set (keys (sut/source-map)))))
 
   (it "finds only the reachable standard modules for a root AIR-J module"
@@ -49,3 +49,19 @@
       (should (contains? interfaces 'airj/process))
       (should-not (contains? interfaces 'airj/file))
       (should-not (contains? interfaces 'airj/env)))))
+
+  (it "finds the AIR-J test module as reachable when imported"
+    (let [module (parser/parse-module
+                  "(module example/tests
+                     (imports
+                       (airj airj/test TestOutcome assert-true))
+                     (export passing)
+                     (fn passing
+                       (params)
+                       (returns TestOutcome)
+                       (effects ())
+                       (requires true)
+                       (ensures true)
+                       (call (local assert-true) \"passing\" true)))")]
+      (should= #{'airj/core 'airj/test}
+               (set (keys (sut/reachable-source-map module))))))
