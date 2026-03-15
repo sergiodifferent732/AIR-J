@@ -3,53 +3,49 @@
             [speclj.core :refer :all]))
 
 (describe "test runner"
-  (it "runs exported AIR-J tests from source and summarizes pass fail and error outcomes"
+  (it "reports an uncaught canonical test suite exception as one test error"
     (let [source "(module example/tests
                     (imports
-                      (airj airj/test TestOutcome assert-true assert-false))
-                    (export passing failing exploding)
-                    (fn passing
+                      (airj airj/test TestOutcome assert-true assert-false)
+                      (airj airj/test-runner run))
+                    (export tests main)
+                    (fn tests
                       (params)
-                      (returns TestOutcome)
-                      (effects ())
-                      (requires true)
-                      (ensures true)
-                      (call (local assert-true) \"passing\" true))
-                    (fn failing
-                      (params)
-                      (returns TestOutcome)
-                      (effects ())
-                      (requires true)
-                      (ensures true)
-                      (call (local assert-false) \"failing\" true))
-                    (fn exploding
-                      (params)
-                      (returns TestOutcome)
+                      (returns (Seq TestOutcome))
                       (effects (Foreign.Throw))
                       (requires true)
                       (ensures true)
-                      (seq
-                        (string->int \"boom\")
-                        (call (local assert-true) \"exploding\" true))))"
+                      (seq-concat
+                        (seq-append
+                          (seq-append
+                            (seq-empty TestOutcome)
+                            (call (local assert-true) \"passing\" true))
+                          (call (local assert-false) \"failing\" true))
+                        (seq-append
+                          (seq-empty TestOutcome)
+                          (seq
+                            (string->int \"boom\")
+                            (call (local assert-true) \"exploding\" true)))))
+                    (fn main
+                      (params (args StringSeq))
+                      (returns Int)
+                      (effects (Stdout.Write Foreign.Throw))
+                      (requires true)
+                      (ensures true)
+                      (call (local run) (call (local tests)))) )"
           summary (sut/run-source-tests! source)]
-      (should= 1 (:passed summary))
-      (should= 1 (:failed summary))
+      (should= "example/tests" (:module summary))
+      (should= 0 (:passed summary))
+      (should= 0 (:failed summary))
       (should= 1 (:errored summary))
-      (should= [{:status "pass"
-                 :name "passing"}
-                {:status "fail"
-                 :name "failing"
-                 :diagnostic {:phase "test"
-                              :message "Expected false."
-                              :detail "Assertion evaluated to true."}}
-                {:status "error"
-                 :name "exploding"
+      (should= [{:status "error"
+                 :name "tests"
                  :diagnostic {:phase "runtime"
                               :message "Execution error."
                               :detail "java.lang.NumberFormatException: For input string: \"boom\""}}]
                (:outcomes summary))))
 
-  (it "runs exported AIR-J tests from project sources"
+  (it "runs canonical AIR-J test suites from project sources"
     (let [module-sources
           {'alpha/math "(module alpha/math
                           (imports)
@@ -63,20 +59,31 @@
                             (local x)))"
            'example/tests "(module example/tests
                              (imports
-                             (airj alpha/math tick)
-                             (airj airj/test TestOutcome assert-int-eq))
-                             (export tick-test)
-                             (fn tick-test
+                               (airj alpha/math tick)
+                               (airj airj/test TestOutcome assert-int-eq)
+                               (airj airj/test-runner run))
+                             (export tests main)
+                             (fn tests
                                (params)
-                               (returns TestOutcome)
+                               (returns (Seq TestOutcome))
                                (effects ())
                                (requires true)
                                (ensures true)
-                               (call (local assert-int-eq)
-                                     \"tick-test\"
-                                     (call (local tick) 7)
-                                     7)))"}
+                               (seq-append
+                                 (seq-empty TestOutcome)
+                                 (call (local assert-int-eq)
+                                       \"tick-test\"
+                                       (call (local tick) 7)
+                                       7)))
+                             (fn main
+                               (params (args StringSeq))
+                               (returns Int)
+                               (effects (Stdout.Write))
+                               (requires true)
+                               (ensures true)
+                               (call (local run) (call (local tests)))))"}
           summary (sut/run-project-source-tests! module-sources 'example/tests)]
+      (should= "example/tests" (:module summary))
       (should= 1 (:passed summary))
       (should= 0 (:failed summary))
       (should= 0 (:errored summary))
@@ -84,38 +91,18 @@
                  :name "tick-test"}]
                (:outcomes summary))))
 
-  (it "prefers an exported AIR-J tests suite function when present"
+  (it "rejects non-canonical test modules without exported tests and main"
     (let [source "(module example/tests
                     (imports
-                      (airj airj/test TestOutcome assert-true assert-false))
-                    (export tests passing ignored)
+                      (airj airj/test TestOutcome assert-true))
+                    (export passing)
                     (fn passing
                       (params)
                       (returns TestOutcome)
                       (effects ())
                       (requires true)
                       (ensures true)
-                      (call (local assert-false) \"passing\" true))
-                    (fn ignored
-                      (params)
-                      (returns TestOutcome)
-                      (effects ())
-                      (requires true)
-                      (ensures true)
-                      (call (local assert-false) \"ignored\" true))
-                    (fn tests
-                      (params)
-                      (returns (Seq TestOutcome))
-                      (effects ())
-                      (requires true)
-                      (ensures true)
-                      (seq-append
-                        (seq-empty TestOutcome)
-                        (call (local assert-true) \"suite-pass\" true)))))"
-          summary (sut/run-source-tests! source)]
-      (should= 1 (:passed summary))
-      (should= 0 (:failed summary))
-      (should= 0 (:errored summary))
-      (should= [{:status "pass"
-                 :name "suite-pass"}]
-               (:outcomes summary)))))
+                      (call (local assert-true) \"passing\" true)))"]
+      (should-throw clojure.lang.ExceptionInfo
+                    "Malformed AIR-J test module."
+                    (sut/run-source-tests! source)))))

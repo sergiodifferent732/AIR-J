@@ -6,11 +6,11 @@
             [clojure.java.io :as io]
             [clojure.string :as str]))
 
-(def ^:private test-return-types
-  #{'TestOutcome 'TestPass 'TestFail 'TestError})
-
 (def ^:private test-suite-return-type
   '(Seq TestOutcome))
+
+(def ^:private main-param-type
+  'StringSeq)
 
 (declare summary)
 
@@ -35,16 +35,6 @@
                 (into-array java.net.URL [url]))]
     (.loadClass loader class-name)))
 
-(defn- exported-tests
-  [module export-order]
-  (let [decls-by-name (into {} (map (juxt :name identity) (:decls module)))]
-    (->> export-order
-         (map decls-by-name)
-         (filter #(and (= :fn (:op %))
-                       (empty? (:params %))
-                       (contains? test-return-types (:return-type %))))
-         vec)))
-
 (defn- exported-test-suite
   [module export-order]
   (let [decls-by-name (into {} (map (juxt :name identity) (:decls module)))]
@@ -55,6 +45,34 @@
                            (empty? (:params %))
                            (= test-suite-return-type (:return-type %))))
              first)))
+
+(defn- exported-main
+  [module export-order]
+  (let [decls-by-name (into {} (map (juxt :name identity) (:decls module)))]
+    (some->> export-order
+             (map decls-by-name)
+             (filter #(and (= :fn (:op %))
+                           (= 'main (:name %))
+                           (= 1 (count (:params %)))
+                           (= main-param-type (-> % :params first :type))
+                           (= 'Int (:return-type %))
+                           (some #{'Stdout.Write} (:effects %))))
+             first)))
+
+(defn- fail!
+  [message data]
+  (throw (ex-info message (assoc data :phase :test))))
+
+(defn- ensure-canonical-test-module!
+  [module export-order]
+  (when-not (exported-test-suite module export-order)
+    (fail! "Malformed AIR-J test module."
+           {:module (:name module)
+            :detail "Expected exported zero-arg tests : () -> (Seq TestOutcome)."}))
+  (when-not (exported-main module export-order)
+    (fail! "Malformed AIR-J test module."
+           {:module (:name module)
+            :detail "Expected exported main : (StringSeq) -> Int with Stdout.Write."})))
 
 (defn- field-value
   [object field-name]
@@ -121,28 +139,29 @@
         (execution-error (str name) (.getTargetException e))))))
 
 (defn- invoke-test-suite
-  [klass suite-decl]
+  [module-name klass suite-decl]
   (let [method (.getMethod klass (method-name (:name suite-decl)) (into-array Class []))]
     (try
-      (summary (mapv #(outcome-map nil %) (.invoke method nil (object-array []))))
+      (summary module-name (mapv #(outcome-map nil %) (.invoke method nil (object-array []))))
       (catch java.lang.reflect.InvocationTargetException e
-        (summary [(execution-error "tests" (.getTargetException e))])))))
+        (summary module-name [(execution-error "tests" (.getTargetException e))])))))
 
 (defn- summary
-  [outcomes]
-  {:passed (count (filter #(= "pass" (:status %)) outcomes))
+  [module-name outcomes]
+  {:module (str module-name)
+   :passed (count (filter #(= "pass" (:status %)) outcomes))
    :failed (count (filter #(= "fail" (:status %)) outcomes))
    :errored (count (filter #(= "error" (:status %)) outcomes))
    :outcomes outcomes})
 
 (defn- run-tests
   [module bundle export-order]
+  (ensure-canonical-test-module! module export-order)
   (let [output-dir (temp-output-dir)
         _ (compiler/write-bundle! bundle output-dir)
-        klass (load-class-from-dir output-dir (class-name module))]
-    (if-let [suite-decl (exported-test-suite module export-order)]
-      (invoke-test-suite klass suite-decl)
-      (summary (mapv #(invoke-test klass %) (exported-tests module export-order))))))
+        klass (load-class-from-dir output-dir (class-name module))
+        suite-decl (exported-test-suite module export-order)]
+    (invoke-test-suite (:name module) klass suite-decl)))
 
 (defn run-source-tests!
   [source]
@@ -178,7 +197,10 @@
                        "fail" (str "FAIL " (:name outcome) ": " (get-in outcome [:diagnostic :message]))
                        "error" (str "ERROR " (:name outcome) ": " (get-in outcome [:diagnostic :message]))))
                    (:outcomes summary))]
-    (str (str/join "\n" lines)
+    (str "Module: "
+         (:module summary)
+         "\n"
+         (str/join "\n" lines)
          (when (seq lines) "\n")
          "Summary: "
          (:passed summary)
@@ -189,5 +211,5 @@
          " errored")))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-15T12:53:45.544905-05:00", :module-hash "-1819920809", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 7, :hash "-601430363"} {:id "def/test-return-types", :kind "def", :line 9, :end-line 10, :hash "-870535961"} {:id "def/test-suite-return-type", :kind "def", :line 12, :end-line 13, :hash "-2092148690"} {:id "form/3/declare", :kind "declare", :line 15, :end-line 15, :hash "2053142492"} {:id "defn-/temp-output-dir", :kind "defn-", :line 17, :end-line 21, :hash "559598651"} {:id "defn-/class-name", :kind "defn-", :line 23, :end-line 25, :hash "-314160674"} {:id "defn-/method-name", :kind "defn-", :line 27, :end-line 29, :hash "-1731610028"} {:id "defn-/load-class-from-dir", :kind "defn-", :line 31, :end-line 36, :hash "-1739352517"} {:id "defn-/exported-tests", :kind "defn-", :line 38, :end-line 46, :hash "-1503506462"} {:id "defn-/exported-test-suite", :kind "defn-", :line 48, :end-line 57, :hash "-563899476"} {:id "defn-/field-value", :kind "defn-", :line 59, :end-line 61, :hash "-2078382156"} {:id "defn-/diagnostic-map", :kind "defn-", :line 63, :end-line 71, :hash "-1957919945"} {:id "defn-/unexpected-outcome", :kind "defn-", :line 73, :end-line 79, :hash "-1505678912"} {:id "defn-/outcome-map", :kind "defn-", :line 81, :end-line 100, :hash "1550567249"} {:id "defn-/throwable-detail", :kind "defn-", :line 102, :end-line 104, :hash "-328705310"} {:id "defn-/execution-error", :kind "defn-", :line 106, :end-line 112, :hash "-2023157389"} {:id "defn-/invoke-test", :kind "defn-", :line 114, :end-line 121, :hash "-445921971"} {:id "defn-/invoke-test-suite", :kind "defn-", :line 123, :end-line 129, :hash "402335308"} {:id "defn-/summary", :kind "defn-", :line 131, :end-line 136, :hash "-1891471303"} {:id "defn-/run-tests", :kind "defn-", :line 138, :end-line 145, :hash "-749763612"} {:id "defn/run-source-tests!", :kind "defn", :line 147, :end-line 152, :hash "825598030"} {:id "defn/run-project-source-tests!", :kind "defn", :line 154, :end-line 159, :hash "1881464140"} {:id "defn/run-project-dir-tests!", :kind "defn", :line 161, :end-line 167, :hash "-513862989"} {:id "defn/summary->json", :kind "defn", :line 169, :end-line 171, :hash "-143482131"} {:id "defn/summary->text", :kind "defn", :line 173, :end-line 189, :hash "-1794054746"}]}
+;; {:version 1, :tested-at "2026-03-15T13:47:06.798619-05:00", :module-hash "-803272560", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 7, :hash "-601430363"} {:id "def/test-suite-return-type", :kind "def", :line 9, :end-line 10, :hash "-2092148690"} {:id "def/main-param-type", :kind "def", :line 12, :end-line 13, :hash "1719642001"} {:id "form/3/declare", :kind "declare", :line 15, :end-line 15, :hash "2053142492"} {:id "defn-/temp-output-dir", :kind "defn-", :line 17, :end-line 21, :hash "559598651"} {:id "defn-/class-name", :kind "defn-", :line 23, :end-line 25, :hash "-314160674"} {:id "defn-/method-name", :kind "defn-", :line 27, :end-line 29, :hash "-1731610028"} {:id "defn-/load-class-from-dir", :kind "defn-", :line 31, :end-line 36, :hash "-1739352517"} {:id "defn-/exported-test-suite", :kind "defn-", :line 38, :end-line 47, :hash "-1803344014"} {:id "defn-/exported-main", :kind "defn-", :line 49, :end-line 60, :hash "-1689303310"} {:id "defn-/fail!", :kind "defn-", :line 62, :end-line 64, :hash "-459802263"} {:id "defn-/ensure-canonical-test-module!", :kind "defn-", :line 66, :end-line 75, :hash "-1563303375"} {:id "defn-/field-value", :kind "defn-", :line 77, :end-line 79, :hash "-2078382156"} {:id "defn-/diagnostic-map", :kind "defn-", :line 81, :end-line 89, :hash "-1957919945"} {:id "defn-/unexpected-outcome", :kind "defn-", :line 91, :end-line 97, :hash "-1505678912"} {:id "defn-/outcome-map", :kind "defn-", :line 99, :end-line 118, :hash "1550567249"} {:id "defn-/throwable-detail", :kind "defn-", :line 120, :end-line 122, :hash "-328705310"} {:id "defn-/execution-error", :kind "defn-", :line 124, :end-line 130, :hash "-2023157389"} {:id "defn-/invoke-test", :kind "defn-", :line 132, :end-line 139, :hash "-445921971"} {:id "defn-/invoke-test-suite", :kind "defn-", :line 141, :end-line 147, :hash "-29650502"} {:id "defn-/summary", :kind "defn-", :line 149, :end-line 155, :hash "2038126858"} {:id "defn-/run-tests", :kind "defn-", :line 157, :end-line 164, :hash "1284299481"} {:id "defn/run-source-tests!", :kind "defn", :line 166, :end-line 171, :hash "825598030"} {:id "defn/run-project-source-tests!", :kind "defn", :line 173, :end-line 178, :hash "1881464140"} {:id "defn/run-project-dir-tests!", :kind "defn", :line 180, :end-line 186, :hash "-513862989"} {:id "defn/summary->json", :kind "defn", :line 188, :end-line 190, :hash "-143482131"} {:id "defn/summary->text", :kind "defn", :line 192, :end-line 211, :hash "158746297"}]}
 ;; clj-mutate-manifest-end

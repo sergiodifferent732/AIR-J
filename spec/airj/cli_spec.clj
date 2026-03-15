@@ -45,64 +45,42 @@
                   "Unsupported command."
                   (sut/run ["compile"] "")))
 
-  (it "runs exported AIR-J tests and renders a human summary"
-    (let [source "(module example/tests
-                    (imports
-                      (airj airj/test TestOutcome assert-true assert-false))
-                    (export passing failing)
-                    (fn passing
-                      (params)
-                      (returns TestOutcome)
-                      (effects ())
-                      (requires true)
-                      (ensures true)
-                      (call (local assert-true) \"passing\" true))
-                    (fn failing
-                      (params)
-                      (returns TestOutcome)
-                      (effects ())
-                      (requires true)
-                      (ensures true)
-                      (call (local assert-false) \"failing\" true))))"
-          result (sut/run ["test" "--stdin"] source)]
-      (should-contain "PASS passing" result)
-      (should-contain "FAIL failing" result)
-      (should-contain "Summary: 1 passed, 1 failed, 0 errored" result)))
-
-  (it "runs exported AIR-J tests and renders JSON on request"
-    (let [source "(module example/tests
-                    (imports
-                      (airj airj/test TestOutcome assert-true))
-                    (export passing)
-                    (fn passing
-                      (params)
-                      (returns TestOutcome)
-                      (effects ())
-                      (requires true)
-                      (ensures true)
-                      (call (local assert-true) \"passing\" true))))"
-          result (sut/run ["test" "--json" "--stdin"] source)
-          parsed (json/read-str result)]
-      (should= {"passed" 1
-                "failed" 0
-                "errored" 0
-                "outcomes" [{"status" "pass"
-                             "name" "passing"}]}
-               parsed)))
-
-  (it "runs AIR-J tests from an exported tests suite when present"
+  (it "runs canonical AIR-J tests and renders a human summary"
     (let [source "(module example/tests
                     (imports
                       (airj airj/test TestOutcome assert-true assert-false)
                       (airj airj/test-runner run))
-                    (export tests ignored main)
-                    (fn ignored
+                    (export tests main)
+                    (fn tests
                       (params)
-                      (returns TestOutcome)
+                      (returns (Seq TestOutcome))
                       (effects ())
                       (requires true)
                       (ensures true)
-                      (call (local assert-false) \"ignored\" true))
+                      (seq-append
+                        (seq-append
+                          (seq-empty TestOutcome)
+                          (call (local assert-true) \"passing\" true))
+                        (call (local assert-false) \"failing\" true)))
+                    (fn main
+                      (params (args StringSeq))
+                      (returns Int)
+                      (effects (Stdout.Write))
+                      (requires true)
+                      (ensures true)
+                      (call (local run) (call (local tests)))) )"
+          result (sut/run ["test" "--stdin"] source)]
+      (should-contain "Module: example/tests" result)
+      (should-contain "PASS passing" result)
+      (should-contain "FAIL failing" result)
+      (should-contain "Summary: 1 passed, 1 failed, 0 errored" result)))
+
+  (it "runs canonical AIR-J tests and renders JSON on request"
+    (let [source "(module example/tests
+                    (imports
+                      (airj airj/test TestOutcome assert-true)
+                      (airj airj/test-runner run))
+                    (export tests main)
                     (fn tests
                       (params)
                       (returns (Seq TestOutcome))
@@ -111,18 +89,39 @@
                       (ensures true)
                       (seq-append
                         (seq-empty TestOutcome)
-                        (call (local assert-true) \"suite-pass\" true)))
+                        (call (local assert-true) \"passing\" true)))
                     (fn main
                       (params (args StringSeq))
                       (returns Int)
                       (effects (Stdout.Write))
                       (requires true)
                       (ensures true)
-                      (call (local run) (call (local tests))))))"
-          result (sut/run ["test" "--stdin"] source)]
-      (should-contain "PASS suite-pass" result)
-      (should-not-contain "ignored" result)
-      (should-contain "Summary: 1 passed, 0 failed, 0 errored" result)))
+                      (call (local run) (call (local tests)))) )"
+          result (sut/run ["test" "--json" "--stdin"] source)
+          parsed (json/read-str result)]
+      (should= {"module" "example/tests"
+                "passed" 1
+                "failed" 0
+                "errored" 0
+                "outcomes" [{"status" "pass"
+                             "name" "passing"}]}
+               parsed)))
+
+  (it "rejects non-canonical AIR-J test modules"
+    (let [source "(module example/tests
+                    (imports
+                      (airj airj/test TestOutcome assert-true))
+                    (export smoke)
+                    (fn smoke
+                      (params)
+                      (returns TestOutcome)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (call (local assert-true) \"smoke\" true)))"]
+      (should-throw clojure.lang.ExceptionInfo
+                    "Malformed AIR-J test module."
+                    (sut/run ["test" "--stdin"] source))))
 
   (it "renders normalized modules as edn for the normalize command"
     (let [source "(module example/normalize

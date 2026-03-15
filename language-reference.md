@@ -435,6 +435,8 @@ AIR-J test modules should use one canonical shape:
 - import `airj/test` for `TestOutcome` and assertions
 - export a zero-arg `tests` function returning `(Seq TestOutcome)`
 - implement `main` as a direct call to `airj/test-runner.run`
+- the bootstrap CLI `test` command expects exactly that shape
+- exporting individual zero-arg `TestOutcome` functions is not a second supported test-module convention
 
 Example:
 
@@ -461,6 +463,13 @@ Example:
     (ensures true)
     (call (local run) (call (local tests)))))
 ```
+
+The canonical bootstrap result artifact is:
+- `module : String`
+- `passed : Int`
+- `failed : Int`
+- `errored : Int`
+- `outcomes : (Seq ...)`
 
 ## Failure Model
 

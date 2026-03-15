@@ -12,6 +12,12 @@ This example is a complete AIR-J console game with AIR-J unit tests. It is split
 - `hunt_the_wumpus.airj`: the playable console game
 - `hunt_the_wumpus_tests.airj`: AIR-J unit tests using the canonical `tests` suite function plus an AIR-J runner `main`
 
+The test module uses the canonical AIR-J test shape:
+
+- exported `tests : () -> (Seq TestOutcome)`
+- exported `main : (StringSeq) -> Int`
+- AIR-J `run` logic from `airj/test-runner`
+
 The tests exercise:
 
 - command parsing through canonical `Option` and `Result` values
