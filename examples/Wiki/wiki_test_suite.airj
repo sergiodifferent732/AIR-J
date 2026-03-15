@@ -1,0 +1,756 @@
+(module example/wiki_test_suite
+  (imports
+    (airj airj/core Diagnostic Result Option)
+    (airj airj/test TestOutcome
+                          fail
+                          assert-bool-eq
+                          assert-diagnostic-detail
+                          assert-int-eq
+                          assert-none-string
+                          assert-some-string
+                          assert-string-eq)
+    (airj example/wiki Wiki
+                        empty-wiki
+                        page-exists?
+                        create-page
+                        update-page
+                        delete-page
+                        view-page
+                        list-titles
+                        search-pages
+                        history-bodies
+                        invoke-link
+                        create-offer
+                        rendered-contains-link?
+                        rendered-indicates-missing-link?))
+  (export suite)
+
+  (fn titles-joined
+    (params (titles (Seq String)))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (loop ((remaining (local titles))
+           (result ""))
+      (if (seq-empty? (local remaining))
+        (local result)
+        (if (string-empty? (local result))
+          (recur
+            (seq-rest (local remaining))
+            (seq-first (local remaining)))
+          (recur
+            (seq-rest (local remaining))
+            (string-concat
+              (local result)
+              (string-concat "|" (seq-first (local remaining)))))))))
+
+  (fn wiki-from-home-and-install
+    (params)
+    (returns Wiki)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local create-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Home"
+                              "See [[Install Guide]]")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Install Guide"
+                 "Setup steps")
+      (case (Ok wiki)
+        (local wiki))
+      (case (Err diagnostic)
+        (call (local empty-wiki)))))
+
+  (fn creates-a-new-page
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local create-page)
+                 (call (local empty-wiki))
+                 "Java Basics"
+                 "Java is a class-based language.")
+      (case (Ok wiki)
+        (match (call (local view-page) (local wiki) "Java Basics")
+          (case (Ok page-view)
+            (call (local assert-string-eq)
+                  "creates a new page"
+                  (record-get (local page-view) body)
+                  "Java is a class-based language."))
+          (case (Err diagnostic)
+            (call (local fail)
+                  "creates a new page"
+                  "Expected created page."
+                  (record-get (local diagnostic) detail)))))
+      (case (Err diagnostic)
+        (call (local fail)
+              "creates a new page"
+              "Page creation failed."
+              (record-get (local diagnostic) detail)))))
+
+  (fn rejects-duplicate-title
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local create-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Java Basics"
+                              "Initial content")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Java Basics"
+                 "Different content")
+      (case (Ok wiki)
+        (call (local fail)
+              "rejects duplicate title"
+              "Expected duplicate rejection."
+              "create-page succeeded."))
+      (case (Err diagnostic)
+        (call (local assert-diagnostic-detail)
+              "rejects duplicate title"
+              (local diagnostic)
+              "page.title.duplicate"))))
+
+  (fn views-existing-page
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Spring Boot"
+                              "A Java framework")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Spring Boot")
+      (case (Ok page-view)
+        (call (local assert-string-eq)
+              "views existing page"
+              (record-get (local page-view) title)
+              "Spring Boot"))
+      (case (Err diagnostic)
+        (call (local fail)
+              "views existing page"
+              "Expected page view."
+              (record-get (local diagnostic) detail)))))
+
+  (fn returns-not-found-for-missing-page
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page) (call (local empty-wiki)) "Missing Page")
+      (case (Ok page-view)
+        (call (local fail)
+              "returns not found for missing page"
+              "Expected page.not_found."
+              (record-get (local page-view) title)))
+      (case (Err diagnostic)
+        (call (local assert-diagnostic-detail)
+              "returns not found for missing page"
+              (local diagnostic)
+              "page.not_found"))))
+
+  (fn edits-an-existing-page
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local update-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Build Tool"
+                              "Use Ant")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Build Tool"
+                 "Use Maven or Gradle.")
+      (case (Ok wiki)
+        (match (call (local view-page) (local wiki) "Build Tool")
+          (case (Ok page-view)
+            (call (local assert-string-eq)
+                  "edits an existing page"
+                  (record-get (local page-view) body)
+                  "Use Maven or Gradle."))
+          (case (Err diagnostic)
+            (call (local fail)
+                  "edits an existing page"
+                  "Expected updated page."
+                  (record-get (local diagnostic) detail)))))
+      (case (Err diagnostic)
+        (call (local fail)
+              "edits an existing page"
+              "Update failed."
+              (record-get (local diagnostic) detail)))))
+
+  (fn deletes-a-page
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local delete-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Temporary"
+                              "to be removed")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Temporary")
+      (case (Ok wiki)
+        (call (local assert-bool-eq)
+              "deletes a page"
+              (call (local page-exists?) (local wiki) "Temporary")
+              false))
+      (case (Err diagnostic)
+        (call (local fail)
+              "deletes a page"
+              "Delete failed."
+              (record-get (local diagnostic) detail)))))
+
+  (fn rejects-blank-title
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local create-page)
+                 (call (local empty-wiki))
+                 ""
+                 "No title")
+      (case (Ok wiki)
+        (call (local fail)
+              "rejects blank title"
+              "Expected blank-title rejection."
+              "create-page succeeded."))
+      (case (Err diagnostic)
+        (call (local assert-diagnostic-detail)
+              "rejects blank title"
+              (local diagnostic)
+              "page.title.blank"))))
+
+  (fn rejects-blank-body
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local create-page)
+                 (call (local empty-wiki))
+                 "Java Basics"
+                 "")
+      (case (Ok wiki)
+        (call (local fail)
+              "rejects blank body"
+              "Expected blank-body rejection."
+              "create-page succeeded."))
+      (case (Err diagnostic)
+        (call (local assert-diagnostic-detail)
+              "rejects blank body"
+              (local diagnostic)
+              "page.body.blank"))))
+
+  (fn trims-new-page-title
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local create-page)
+                 (call (local empty-wiki))
+                 "  Java Basics  "
+                 "Core concepts")
+      (case (Ok wiki)
+        (call (local assert-bool-eq)
+              "trims new page title"
+              (call (local page-exists?) (local wiki) "Java Basics")
+              true))
+      (case (Err diagnostic)
+        (call (local fail)
+              "trims new page title"
+              "Expected trimmed title to create."
+              (record-get (local diagnostic) detail)))))
+
+  (fn lists-page-titles-alphabetically
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((wiki-three
+            (match (call (local create-page)
+                         (match (call (local create-page)
+                                      (match (call (local create-page)
+                                                   (call (local empty-wiki))
+                                                   "Zeta"
+                                                   "last")
+                                        (case (Ok wiki)
+                                          (local wiki))
+                                        (case (Err diagnostic)
+                                          (call (local empty-wiki))))
+                                      "Alpha"
+                                      "first")
+                           (case (Ok wiki)
+                             (local wiki))
+                           (case (Err diagnostic)
+                             (call (local empty-wiki))))
+                         "Gamma"
+                         "middle")
+              (case (Ok wiki)
+                (local wiki))
+              (case (Err diagnostic)
+                (call (local empty-wiki))))))
+      (call (local assert-string-eq)
+            "lists page titles alphabetically"
+            (call (local titles-joined) (call (local list-titles) (local wiki-three)))
+            "Alpha|Gamma|Zeta")))
+
+  (fn searches-pages-by-title-and-body
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((wiki-three
+            (match (call (local create-page)
+                         (match (call (local create-page)
+                                      (match (call (local create-page)
+                                                   (call (local empty-wiki))
+                                                   "Dependency Injection"
+                                                   "Spring supports Java dependency injection")
+                                        (case (Ok wiki)
+                                          (local wiki))
+                                        (case (Err diagnostic)
+                                          (call (local empty-wiki))))
+                                      "Testing"
+                                      "Use JUnit for Java")
+                           (case (Ok wiki)
+                             (local wiki))
+                           (case (Err diagnostic)
+                             (call (local empty-wiki))))
+                         "Containers"
+                         "Docker basics")
+              (case (Ok wiki)
+                (local wiki))
+              (case (Err diagnostic)
+                (call (local empty-wiki))))))
+      (match (call (local search-pages) (local wiki-three) "Java")
+        (case (Ok titles)
+          (call (local assert-string-eq)
+                "searches pages by title and body"
+                (call (local titles-joined) (local titles))
+                "Dependency Injection|Testing"))
+        (case (Err diagnostic)
+          (call (local fail)
+                "searches pages by title and body"
+                "Search failed."
+                (record-get (local diagnostic) detail))))))
+
+  (fn rejects-blank-search-query
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local search-pages) (call (local empty-wiki)) "")
+      (case (Ok titles)
+        (call (local fail)
+              "rejects blank search query"
+              "Expected blank search rejection."
+              (call (local titles-joined) (local titles))))
+      (case (Err diagnostic)
+        (call (local assert-diagnostic-detail)
+              "rejects blank search query"
+              (local diagnostic)
+              "search.query.blank"))))
+
+  (fn keeps-revision-history-after-edits
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local history-bodies)
+                 (match (call (local update-page)
+                              (match (call (local update-page)
+                                           (match (call (local create-page)
+                                                        (call (local empty-wiki))
+                                                        "Roadmap"
+                                                        "v1")
+                                             (case (Ok wiki)
+                                               (local wiki))
+                                             (case (Err diagnostic)
+                                               (call (local empty-wiki))))
+                                           "Roadmap"
+                                           "v2")
+                                (case (Ok wiki)
+                                  (local wiki))
+                                (case (Err diagnostic)
+                                  (call (local empty-wiki))))
+                              "Roadmap"
+                              "v3")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Roadmap")
+      (case (Ok bodies)
+        (call (local assert-string-eq)
+              "keeps revision history after edits"
+              (call (local titles-joined) (local bodies))
+              "v1|v2|v3"))
+      (case (Err diagnostic)
+        (call (local fail)
+              "keeps revision history after edits"
+              "Expected revision history."
+              (record-get (local diagnostic) detail)))))
+
+  (fn renders-wiki-link-to-existing-page
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page)
+                 (call (local wiki-from-home-and-install))
+                 "Home")
+      (case (Ok page-view)
+        (call (local assert-bool-eq)
+              "renders wiki link to existing page"
+              (call (local rendered-contains-link?)
+                    (record-get (local page-view) rendered)
+                    "Install Guide")
+              true))
+      (case (Err diagnostic)
+        (call (local fail)
+              "renders wiki link to existing page"
+              "Expected rendered page."
+              (record-get (local diagnostic) detail)))))
+
+  (fn follows-a-rendered-wiki-link
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local invoke-link)
+                 (call (local wiki-from-home-and-install))
+                 "Home"
+                 "Install Guide")
+      (case (Ok page-view)
+        (call (local assert-string-eq)
+              "follows a rendered wiki link"
+              (record-get (local page-view) body)
+              "Setup steps"))
+      (case (Err diagnostic)
+        (call (local fail)
+              "follows a rendered wiki link"
+              "Expected linked page."
+              (record-get (local diagnostic) detail)))))
+
+  (fn marks-a-link-to-a-missing-page
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Home"
+                              "See [[Missing Guide]]")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Home")
+      (case (Ok page-view)
+        (call (local assert-bool-eq)
+              "marks a link to a missing page"
+              (call (local rendered-indicates-missing-link?)
+                    (record-get (local page-view) rendered)
+                    "Missing Guide")
+              true))
+      (case (Err diagnostic)
+        (call (local fail)
+              "marks a link to a missing page"
+              "Expected rendered page."
+              (record-get (local diagnostic) detail)))))
+
+  (fn offers-page-creation-for-missing-link
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local assert-some-string)
+          "offers page creation for missing link"
+          (call (local create-offer)
+                (match (call (local create-page)
+                             (call (local empty-wiki))
+                             "Home"
+                             "See [[Missing Guide]]")
+                  (case (Ok wiki)
+                    (local wiki))
+                  (case (Err diagnostic)
+                    (call (local empty-wiki))))
+                "Missing Guide")
+          "Missing Guide"))
+
+  (fn supports-a-page-linking-to-itself
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Home"
+                              "Back to [[Home]]")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Home")
+      (case (Ok page-view)
+        (call (local assert-bool-eq)
+              "supports a page linking to itself"
+              (call (local rendered-contains-link?)
+                    (record-get (local page-view) rendered)
+                    "Home")
+              true))
+      (case (Err diagnostic)
+        (call (local fail)
+              "supports a page linking to itself"
+              "Expected rendered page."
+              (record-get (local diagnostic) detail)))))
+
+  (fn renders-headings-and-paragraphs
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Home"
+                              "# Welcome\n\nThis is the home page.")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Home")
+      (case (Ok page-view)
+        (call (local assert-string-eq)
+              "renders headings and paragraphs"
+              (record-get (local page-view) rendered)
+              "<h1>Welcome</h1><p>This is the home page.</p>"))
+      (case (Err diagnostic)
+        (call (local fail)
+              "renders headings and paragraphs"
+              "Expected rendered page."
+              (record-get (local diagnostic) detail)))))
+
+  (fn renders-emphasis-and-strong-text
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Formatting"
+                              "Use *italics* and **bold** for emphasis.")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Formatting")
+      (case (Ok page-view)
+        (call (local assert-string-eq)
+              "renders emphasis and strong text"
+              (record-get (local page-view) rendered)
+              "<p>Use <em>italics</em> and <strong>bold</strong> for emphasis.</p>"))
+      (case (Err diagnostic)
+        (call (local fail)
+              "renders emphasis and strong text"
+              "Expected rendered page."
+              (record-get (local diagnostic) detail)))))
+
+  (fn renders-unordered-lists
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Checklist"
+                              "- Install Java\n- Run Maven\n- Start the server")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Checklist")
+      (case (Ok page-view)
+        (call (local assert-string-eq)
+              "renders unordered lists"
+              (record-get (local page-view) rendered)
+              "<ul><li>Install Java</li><li>Run Maven</li><li>Start the server</li></ul>"))
+      (case (Err diagnostic)
+        (call (local fail)
+              "renders unordered lists"
+              "Expected rendered page."
+              (record-get (local diagnostic) detail)))))
+
+  (fn renders-wiki-links-inside-markdown
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page)
+                 (match (call (local create-page)
+                              (match (call (local create-page)
+                                           (call (local empty-wiki))
+                                           "Home"
+                                           "# Welcome\n\nStart with [[Install Guide]].")
+                                (case (Ok wiki)
+                                  (local wiki))
+                                (case (Err diagnostic)
+                                  (call (local empty-wiki))))
+                              "Install Guide"
+                              "Setup steps")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Home")
+      (case (Ok page-view)
+        (call (local assert-string-eq)
+              "renders wiki links inside markdown"
+              (record-get (local page-view) rendered)
+              "<h1>Welcome</h1><p>Start with <a href=\"Install Guide\">Install Guide</a>.</p>"))
+      (case (Err diagnostic)
+        (call (local fail)
+              "renders wiki links inside markdown"
+              "Expected rendered page."
+              (record-get (local diagnostic) detail)))))
+
+  (fn leaves-unclosed-wiki-link-as-literal-text
+    (params)
+    (returns TestOutcome)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page)
+                 (match (call (local create-page)
+                              (call (local empty-wiki))
+                              "Home"
+                              "See [[Install Guide")
+                   (case (Ok wiki)
+                     (local wiki))
+                   (case (Err diagnostic)
+                     (call (local empty-wiki))))
+                 "Home")
+      (case (Ok page-view)
+        (call (local assert-string-eq)
+              "leaves unclosed wiki link as literal text"
+              (record-get (local page-view) rendered)
+              "<p>See [[Install Guide</p>"))
+      (case (Err diagnostic)
+        (call (local fail)
+              "leaves unclosed wiki link as literal text"
+              "Expected rendered page."
+              (record-get (local diagnostic) detail)))))
+
+  (fn suite
+    (params)
+    (returns (Seq TestOutcome))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (seq-concat
+      (seq-concat
+        (seq-concat
+          (seq-concat
+            (seq-concat
+              (seq-concat
+                (seq-concat
+                  (seq-concat
+                    (seq-concat
+                      (call (local singleton-test) (call (local creates-a-new-page)))
+                      (call (local singleton-test) (call (local rejects-duplicate-title))))
+                    (call (local singleton-test) (call (local views-existing-page))))
+                  (call (local singleton-test) (call (local returns-not-found-for-missing-page))))
+                (call (local singleton-test) (call (local edits-an-existing-page))))
+              (call (local singleton-test) (call (local deletes-a-page))))
+            (call (local singleton-test) (call (local rejects-blank-title))))
+          (call (local singleton-test) (call (local rejects-blank-body))))
+        (seq-concat
+          (seq-concat
+            (seq-concat
+              (seq-concat
+                (seq-concat
+                  (call (local singleton-test) (call (local trims-new-page-title)))
+                  (call (local singleton-test) (call (local lists-page-titles-alphabetically))))
+                (call (local singleton-test) (call (local searches-pages-by-title-and-body))))
+              (call (local singleton-test) (call (local rejects-blank-search-query))))
+            (call (local singleton-test) (call (local keeps-revision-history-after-edits))))
+          (call (local singleton-test) (call (local renders-wiki-link-to-existing-page)))))
+      (seq-concat
+        (seq-concat
+          (seq-concat
+            (seq-concat
+              (seq-concat
+                (call (local singleton-test) (call (local follows-a-rendered-wiki-link)))
+                (call (local singleton-test) (call (local marks-a-link-to-a-missing-page))))
+              (call (local singleton-test) (call (local offers-page-creation-for-missing-link))))
+            (call (local singleton-test) (call (local supports-a-page-linking-to-itself))))
+          (call (local singleton-test) (call (local renders-headings-and-paragraphs))))
+        (seq-concat
+          (seq-concat
+            (call (local singleton-test) (call (local renders-emphasis-and-strong-text)))
+            (call (local singleton-test) (call (local renders-unordered-lists))))
+          (seq-concat
+            (call (local singleton-test)
+                  (call (local renders-wiki-links-inside-markdown)))
+            (call (local singleton-test)
+                  (call (local leaves-unclosed-wiki-link-as-literal-text))))))))
+
+  (fn singleton-test
+    (params (test TestOutcome))
+    (returns (Seq TestOutcome))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (seq-append
+      (seq-empty TestOutcome)
+      (local test))))
+)

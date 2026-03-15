@@ -1,0 +1,25 @@
+(module example/wiki_tests_json
+  (imports
+    (airj airj/test TestOutcome)
+    (airj airj/test-runner run-json)
+    (airj example/wiki_test_suite suite))
+  (export tests
+          main)
+
+  (fn tests
+    (params)
+    (returns (Seq TestOutcome))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local suite)))
+
+  (fn main
+    (params (args StringSeq))
+    (returns Int)
+    (effects (Stdout.Write Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local run-json)
+          "example/wiki_tests_json"
+          (call (local tests)))))

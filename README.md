@@ -115,6 +115,7 @@ See [`examples/ToolWorkflow/README.md`](/Users/unclebob/projects/AIR-J/examples/
 See [`examples/Contracts/README.md`](/Users/unclebob/projects/AIR-J/examples/Contracts/README.md) for a contract-heavy example that uses invariants plus `requires`/`ensures`.
 See [`examples/Ledger/README.md`](/Users/unclebob/projects/AIR-J/examples/Ledger/README.md) for a contract-heavy ledger example with explicit text and JSON test roots.
 See [`examples/Thermostat/README.md`](/Users/unclebob/projects/AIR-J/examples/Thermostat/README.md) for a non-financial safety-controller example with contract failure tests.
+See [`examples/Wiki/README.md`](/Users/unclebob/projects/AIR-J/examples/Wiki/README.md) for a pure AIR-J wiki domain example mapped from the non-HTTP wiki acceptance features.
 
 ## Development Workflow
 

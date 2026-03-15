@@ -1,0 +1,769 @@
+(module example/wiki
+  (imports
+    (airj airj/core Diagnostic Result Option))
+  (export Revision
+          Page
+          Wiki
+          PageView
+          empty-wiki
+          page-exists?
+          create-page
+          update-page
+          delete-page
+          view-page
+          list-titles
+          search-pages
+          history-bodies
+          invoke-link
+          create-offer
+          render-body
+          rendered-contains-link?
+          rendered-indicates-missing-link?
+          rendered-contains-heading?
+          rendered-contains-paragraph?)
+
+  (data Revision
+    (field body String))
+
+  (data Page
+    (field title String)
+    (field body String)
+    (field revisions (Seq Revision)))
+
+  (data Wiki
+    (field pages (Map String Page)))
+
+  (data PageView
+    (field title String)
+    (field body String)
+    (field rendered String))
+
+  (fn empty-wiki
+    (params)
+    (returns Wiki)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (construct Wiki (map-empty Page)))
+
+  (fn diagnostic
+    (params (message String) (detail String))
+    (returns Diagnostic)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (construct Diagnostic
+               "wiki"
+               (local message)
+               (local detail)))
+
+  (fn normalize-title
+    (params (title String))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (string-trim (local title)))
+
+  (fn blank-text?
+    (params (text String))
+    (returns Bool)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (string-empty? (string-trim (local text))))
+
+  (fn string-index-of
+    (params (text String) (needle String))
+    (returns Int)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local string-index-of-from)
+          (local text)
+          (local needle)
+          0))
+
+  (fn prefix-at?
+    (params (text String) (needle String) (text-index Int) (needle-index Int))
+    (returns Bool)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (int-eq (local needle-index) (string-length (local needle)))
+      true
+      (if (int-ge (local text-index) (string-length (local text)))
+        false
+        (if (string-eq
+              (string-char-at (local text) (local text-index))
+              (string-char-at (local needle) (local needle-index)))
+          (call (local prefix-at?)
+                (local text)
+                (local needle)
+                (int-add (local text-index) 1)
+                (int-add (local needle-index) 1))
+          false))))
+
+  (fn string-index-of-from
+    (params (text String) (needle String) (index Int))
+    (returns Int)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (int-eq (string-length (local needle)) 0)
+      0
+      (if (int-gt
+            (int-add (local index) (string-length (local needle)))
+            (string-length (local text)))
+        -1
+        (if (call (local prefix-at?)
+                  (local text)
+                  (local needle)
+                  (local index)
+                  0)
+          (local index)
+          (call (local string-index-of-from)
+                (local text)
+                (local needle)
+                (int-add (local index) 1))))))
+
+  (fn char-rank
+    (params (ch String))
+    (returns Int)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local char-rank-from)
+          " -0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+          (local ch)
+          0))
+
+  (fn char-rank-from
+    (params (alphabet String) (ch String) (index Int))
+    (returns Int)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (int-ge (local index) (string-length (local alphabet)))
+      999
+      (if (string-eq
+            (string-char-at (local alphabet) (local index))
+            (local ch))
+        (local index)
+        (call (local char-rank-from)
+              (local alphabet)
+              (local ch)
+              (int-add (local index) 1)))))
+
+  (fn string-compare-at
+    (params (left String) (right String) (index Int))
+    (returns Int)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (int-eq (local index) (string-length (local left)))
+      (if (int-eq (local index) (string-length (local right)))
+        0
+        -1)
+      (if (int-eq (local index) (string-length (local right)))
+        1
+        (let ((left-char (string-char-at (local left) (local index)))
+              (right-char (string-char-at (local right) (local index))))
+          (if (string-eq (local left-char) (local right-char))
+            (call (local string-compare-at)
+                  (local left)
+                  (local right)
+                  (int-add (local index) 1))
+            (int-sub
+              (call (local char-rank) (local left-char))
+              (call (local char-rank) (local right-char))))))))
+
+  (fn string-contains?
+    (params (text String) (needle String))
+    (returns Bool)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (int-ge (call (local string-index-of) (local text) (local needle)) 0))
+
+  (fn string-le?
+    (params (left String) (right String))
+    (returns Bool)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (int-le
+      (call (local string-compare-at) (local left) (local right) 0)
+      0))
+
+  (fn page-exists?
+    (params (wiki Wiki) (title String))
+    (returns Bool)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (map-contains?
+      (record-get (local wiki) pages)
+      (call (local normalize-title) (local title))))
+
+  (fn singleton-string
+    (params (value String))
+    (returns (Seq String))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (seq-append
+      (seq-empty String)
+      (local value)))
+
+  (fn singleton-revision
+    (params (value Revision))
+    (returns (Seq Revision))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (seq-append
+      (seq-empty Revision)
+      (local value)))
+
+  (fn insert-title-sorted
+    (params (titles (Seq String)) (title String))
+    (returns (Seq String))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (if (seq-empty? (local titles))
+      (call (local singleton-string) (local title))
+      (if (call (local string-le?) (local title) (seq-first (local titles)))
+        (seq-concat
+          (call (local singleton-string) (local title))
+          (local titles))
+        (seq-concat
+          (call (local singleton-string) (seq-first (local titles)))
+          (call (local insert-title-sorted)
+                (seq-rest (local titles))
+                (local title))))))
+
+  (fn sort-titles
+    (params (titles (Seq String)))
+    (returns (Seq String))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (loop ((remaining (local titles))
+           (sorted (seq-empty String)))
+      (if (seq-empty? (local remaining))
+        (local sorted)
+        (recur
+          (seq-rest (local remaining))
+          (call (local insert-title-sorted)
+                (local sorted)
+                (seq-first (local remaining)))))))
+
+  (fn page-result
+    (params (wiki Wiki) (title String))
+    (returns (Result Page Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((normalized (call (local normalize-title) (local title))))
+      (match (map-get (record-get (local wiki) pages) (local normalized))
+        (case (Some page)
+          (variant (Result Page Diagnostic)
+                   Ok
+                   (local page)))
+        (case (None)
+          (variant (Result Page Diagnostic)
+                   Err
+                   (call (local diagnostic)
+                         "Page not found."
+                         "page.not_found"))))))
+
+  (fn create-page
+    (params (wiki Wiki) (title String) (body String))
+    (returns (Result Wiki Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((normalized (call (local normalize-title) (local title))))
+      (if (call (local blank-text?) (local normalized))
+        (variant (Result Wiki Diagnostic)
+                 Err
+                 (call (local diagnostic)
+                       "Page title is blank."
+                       "page.title.blank"))
+        (if (call (local blank-text?) (local body))
+          (variant (Result Wiki Diagnostic)
+                   Err
+                   (call (local diagnostic)
+                         "Page body is blank."
+                         "page.body.blank"))
+          (if (map-contains? (record-get (local wiki) pages) (local normalized))
+            (variant (Result Wiki Diagnostic)
+                     Err
+                     (call (local diagnostic)
+                           "Page title already exists."
+                           "page.title.duplicate"))
+            (variant (Result Wiki Diagnostic)
+                     Ok
+                     (construct Wiki
+                                (map-set
+                                  (record-get (local wiki) pages)
+                                  (local normalized)
+                                  (construct Page
+                                             (local normalized)
+                                             (local body)
+                                             (call (local singleton-revision)
+                                                   (construct Revision (local body))))))))))))
+
+  (fn update-page
+    (params (wiki Wiki) (title String) (body String))
+    (returns (Result Wiki Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (call (local blank-text?) (local body))
+      (variant (Result Wiki Diagnostic)
+               Err
+               (call (local diagnostic)
+                     "Page body is blank."
+                     "page.body.blank"))
+      (match (call (local page-result) (local wiki) (local title))
+        (case (Ok page)
+          (variant (Result Wiki Diagnostic)
+                   Ok
+                   (construct Wiki
+                              (map-set
+                                (record-get (local wiki) pages)
+                                (record-get (local page) title)
+                                (construct Page
+                                           (record-get (local page) title)
+                                           (local body)
+                                           (seq-append
+                                             (record-get (local page) revisions)
+                                             (construct Revision (local body))))))))
+        (case (Err diagnostic)
+          (variant (Result Wiki Diagnostic)
+                   Err
+                   (local diagnostic))))))
+
+  (fn pages-without
+    (params (pages (Map String Page)) (title String))
+    (returns (Map String Page))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (loop ((remaining (map-keys (local pages)))
+           (rebuilt (map-empty Page)))
+      (if (seq-empty? (local remaining))
+        (local rebuilt)
+        (let ((key (seq-first (local remaining))))
+          (if (string-eq (local key) (local title))
+            (recur (seq-rest (local remaining)) (local rebuilt))
+            (match (map-get (local pages) (local key))
+              (case (Some page)
+                (recur
+                  (seq-rest (local remaining))
+                  (map-set (local rebuilt) (local key) (local page))))
+              (case (None)
+                (recur
+                  (seq-rest (local remaining))
+                  (local rebuilt)))))))))
+
+  (fn delete-page
+    (params (wiki Wiki) (title String))
+    (returns (Result Wiki Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (let ((normalized (call (local normalize-title) (local title))))
+      (if (map-contains? (record-get (local wiki) pages) (local normalized))
+        (variant (Result Wiki Diagnostic)
+                 Ok
+                 (construct Wiki
+                            (call (local pages-without)
+                                  (record-get (local wiki) pages)
+                                  (local normalized))))
+        (variant (Result Wiki Diagnostic)
+                 Err
+                 (call (local diagnostic)
+                       "Page not found."
+                       "page.not_found")))))
+
+  (fn render-link
+    (params (wiki Wiki) (target String))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (call (local page-exists?) (local wiki) (local target))
+      (string-concat
+        (string-concat "<a href=\"" (local target))
+        (string-concat "\">" (string-concat (local target) "</a>")))
+      (string-concat
+        "<span class=\"missing-link\">"
+        (string-concat (local target) "</span>"))))
+
+  (fn render-emphasis
+    (params (text String))
+    (returns String)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((open (call (local string-index-of) (local text) "*")))
+      (if (int-ge (local open) 0)
+        (let ((after-open (string-substring
+                            (local text)
+                            (int-add (local open) 1)
+                            (string-length (local text))))
+              (close-rel (call (local string-index-of) (local after-open) "*")))
+          (if (int-ge (local close-rel) 0)
+            (let ((before (string-substring (local text) 0 (local open)))
+                  (value (string-substring (local after-open) 0 (local close-rel)))
+                  (after (string-substring
+                           (local after-open)
+                           (int-add (local close-rel) 1)
+                           (string-length (local after-open)))))
+              (string-concat
+                (local before)
+                (string-concat
+                  "<em>"
+                  (string-concat
+                    (local value)
+                    (string-concat
+                      "</em>"
+                      (call (local render-emphasis) (local after)))))))
+            (local text)))
+        (local text))))
+
+  (fn render-strong
+    (params (text String))
+    (returns String)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((open (call (local string-index-of) (local text) "**")))
+      (if (int-ge (local open) 0)
+        (let ((after-open (string-substring
+                            (local text)
+                            (int-add (local open) 2)
+                            (string-length (local text))))
+              (close-rel (call (local string-index-of) (local after-open) "**")))
+          (if (int-ge (local close-rel) 0)
+            (let ((before (string-substring (local text) 0 (local open)))
+                  (value (string-substring (local after-open) 0 (local close-rel)))
+                  (after (string-substring
+                           (local after-open)
+                           (int-add (local close-rel) 2)
+                           (string-length (local after-open)))))
+              (string-concat
+                (call (local render-emphasis) (local before))
+                (string-concat
+                  "<strong>"
+                  (string-concat
+                    (local value)
+                    (string-concat
+                      "</strong>"
+                      (call (local render-strong) (local after)))))))
+            (call (local render-emphasis) (local text))))
+        (call (local render-emphasis) (local text)))))
+
+  (fn render-inline
+    (params (wiki Wiki) (text String))
+    (returns String)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((open (call (local string-index-of) (local text) "[[")))
+      (if (int-ge (local open) 0)
+        (let ((after-open (string-substring
+                            (local text)
+                            (int-add (local open) 2)
+                            (string-length (local text))))
+              (close-rel (call (local string-index-of) (local after-open) "]]")))
+          (if (int-ge (local close-rel) 0)
+            (let ((before (string-substring (local text) 0 (local open)))
+                  (target (string-substring (local after-open) 0 (local close-rel)))
+                  (after (string-substring
+                           (local after-open)
+                           (int-add (local close-rel) 2)
+                           (string-length (local after-open)))))
+              (string-concat
+                (local before)
+                (string-concat
+                  (call (local render-link) (local wiki) (local target))
+                  (call (local render-inline) (local wiki) (local after)))))
+            (call (local render-strong) (local text))))
+        (call (local render-strong) (local text)))))
+
+  (fn render-lines
+    (params (wiki Wiki) (lines (Seq String)) (in-list Bool))
+    (returns String)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (if (seq-empty? (local lines))
+      (if (local in-list)
+        "</ul>"
+        "")
+      (let ((line (seq-first (local lines)))
+            (rest-lines (seq-rest (local lines)))
+            (trimmed (string-trim (seq-first (local lines)))))
+        (if (string-empty? (local trimmed))
+          (if (local in-list)
+            (string-concat
+              "</ul>"
+              (call (local render-lines) (local wiki) (local rest-lines) false))
+            (call (local render-lines) (local wiki) (local rest-lines) false))
+          (if (int-eq (call (local string-index-of) (local trimmed) "# ") 0)
+            (let ((heading-text (string-substring
+                                  (local trimmed)
+                                  2
+                                  (string-length (local trimmed)))))
+              (if (local in-list)
+                (string-concat
+                  "</ul>"
+                  (string-concat
+                    "<h1>"
+                    (string-concat
+                      (call (local render-inline) (local wiki) (local heading-text))
+                      (string-concat
+                        "</h1>"
+                        (call (local render-lines) (local wiki) (local rest-lines) false)))))
+                (string-concat
+                  "<h1>"
+                  (string-concat
+                    (call (local render-inline) (local wiki) (local heading-text))
+                    (string-concat
+                      "</h1>"
+                      (call (local render-lines) (local wiki) (local rest-lines) false))))))
+            (if (int-eq (call (local string-index-of) (local trimmed) "- ") 0)
+              (let ((item-text (string-substring
+                                 (local trimmed)
+                                 2
+                                 (string-length (local trimmed))))
+                )
+                (if (local in-list)
+                  (string-concat
+                    "<li>"
+                    (string-concat
+                      (call (local render-inline) (local wiki) (local item-text))
+                      (string-concat
+                        "</li>"
+                        (call (local render-lines) (local wiki) (local rest-lines) true))))
+                  (string-concat
+                    "<ul><li>"
+                    (string-concat
+                      (call (local render-inline) (local wiki) (local item-text))
+                      (string-concat
+                        "</li>"
+                        (call (local render-lines) (local wiki) (local rest-lines) true))))))
+              (if (local in-list)
+                (string-concat
+                  "</ul>"
+                  (string-concat
+                    "<p>"
+                    (string-concat
+                      (call (local render-inline) (local wiki) (local trimmed))
+                      (string-concat
+                        "</p>"
+                        (call (local render-lines) (local wiki) (local rest-lines) false)))))
+                (string-concat
+                  "<p>"
+                  (string-concat
+                    (call (local render-inline) (local wiki) (local trimmed))
+                    (string-concat
+                      "</p>"
+                      (call (local render-lines) (local wiki) (local rest-lines) false)))))))))))
+
+  (fn render-body
+    (params (wiki Wiki) (body String))
+    (returns String)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local render-lines)
+          (local wiki)
+          (string-split-on (local body) "\n")
+          false))
+
+  (fn view-page
+    (params (wiki Wiki) (title String))
+    (returns (Result PageView Diagnostic))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local page-result) (local wiki) (local title))
+      (case (Ok page)
+        (variant (Result PageView Diagnostic)
+                 Ok
+                 (construct PageView
+                            (record-get (local page) title)
+                            (record-get (local page) body)
+                            (call (local render-body)
+                                  (local wiki)
+                                  (record-get (local page) body)))))
+      (case (Err diagnostic)
+        (variant (Result PageView Diagnostic)
+                 Err
+                 (local diagnostic)))))
+
+  (fn list-titles
+    (params (wiki Wiki))
+    (returns (Seq String))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local sort-titles)
+          (map-keys (record-get (local wiki) pages))))
+
+  (fn page-matches?
+    (params (page Page) (query String))
+    (returns Bool)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (bool-or
+      (call (local string-contains?)
+            (record-get (local page) title)
+            (local query))
+      (call (local string-contains?)
+            (record-get (local page) body)
+            (local query))))
+
+  (fn search-pages
+    (params (wiki Wiki) (query String))
+    (returns (Result (Seq String) Diagnostic))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((trimmed (string-trim (local query))))
+      (if (string-empty? (local trimmed))
+        (variant (Result (Seq String) Diagnostic)
+                 Err
+                 (call (local diagnostic)
+                       "Search query is blank."
+                       "search.query.blank"))
+        (variant (Result (Seq String) Diagnostic)
+                 Ok
+                 (loop ((remaining (call (local list-titles) (local wiki)))
+                        (matches (seq-empty String)))
+                   (if (seq-empty? (local remaining))
+                     (local matches)
+                     (match (call (local page-result)
+                                  (local wiki)
+                                  (seq-first (local remaining)))
+                       (case (Ok page)
+                         (if (call (local page-matches?)
+                                   (local page)
+                                   (local trimmed))
+                           (recur
+                             (seq-rest (local remaining))
+                             (seq-append
+                               (local matches)
+                               (record-get (local page) title)))
+                           (recur
+                             (seq-rest (local remaining))
+                             (local matches))))
+                       (case (Err diagnostic)
+                         (recur
+                           (seq-rest (local remaining))
+                           (local matches))))))))))
+
+  (fn revision-bodies
+    (params (revisions (Seq Revision)))
+    (returns (Seq String))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (loop ((remaining (local revisions))
+           (bodies (seq-empty String)))
+      (if (seq-empty? (local remaining))
+        (local bodies)
+        (recur
+          (seq-rest (local remaining))
+          (seq-append
+            (local bodies)
+            (record-get (seq-first (local remaining)) body))))))
+
+  (fn history-bodies
+    (params (wiki Wiki) (title String))
+    (returns (Result (Seq String) Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local page-result) (local wiki) (local title))
+      (case (Ok page)
+        (variant (Result (Seq String) Diagnostic)
+                 Ok
+                 (call (local revision-bodies)
+                       (record-get (local page) revisions))))
+      (case (Err diagnostic)
+        (variant (Result (Seq String) Diagnostic)
+                 Err
+                 (local diagnostic)))))
+
+  (fn invoke-link
+    (params (wiki Wiki) (from-title String) (target String))
+    (returns (Result PageView Diagnostic))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (seq
+      (local from-title)
+      (call (local view-page) (local wiki) (local target))))
+
+  (fn create-offer
+    (params (wiki Wiki) (target String))
+    (returns (Option String))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (call (local page-exists?) (local wiki) (local target))
+      (variant (Option String) None)
+      (variant (Option String) Some (local target))))
+
+  (fn rendered-contains-link?
+    (params (rendered String) (target String))
+    (returns Bool)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local string-contains?)
+          (local rendered)
+          (string-concat
+            (string-concat "<a href=\"" (local target))
+            (string-concat "\">" (string-concat (local target) "</a>")))))
+
+  (fn rendered-indicates-missing-link?
+    (params (rendered String) (target String))
+    (returns Bool)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local string-contains?)
+          (local rendered)
+          (string-concat
+            "<span class=\"missing-link\">"
+            (string-concat (local target) "</span>"))))
+
+  (fn rendered-contains-heading?
+    (params (rendered String) (text String))
+    (returns Bool)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local string-contains?)
+          (local rendered)
+          (string-concat "<h1>" (string-concat (local text) "</h1>"))))
+
+  (fn rendered-contains-paragraph?
+    (params (rendered String) (text String))
+    (returns Bool)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local string-contains?)
+          (local rendered)
+          (string-concat "<p>" (string-concat (local text) "</p>")))))
+)
