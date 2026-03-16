@@ -1,0 +1,341 @@
+(module example/wiki_persistence
+  (imports
+    (airj airj/core Diagnostic Interchange Result)
+    (airj airj/file exists? read-string-result write-string-result)
+    (airj airj/json parse-result write-result)
+    (airj example/wiki Revision Page Wiki))
+  (export page->interchange
+          wiki->interchange
+          interchange->wiki-result
+          save-wiki
+          load-wiki
+          load-wiki-or-default)
+
+  (fn diagnostic
+    (params (message String) (detail String))
+    (returns Diagnostic)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (construct Diagnostic
+               "wiki.persistence"
+               (local message)
+               (local detail)))
+
+  (fn revision->interchange
+    (params (revision Revision))
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (variant Interchange
+             MapValue
+             (map-set
+               (map-empty Interchange)
+               "body"
+               (variant Interchange
+                        StringValue
+                        (record-get (local revision) body)))))
+
+  (fn revisions->interchange
+    (params (revisions (Seq Revision)))
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (loop ((remaining (local revisions))
+           (values (seq-empty Interchange)))
+      (if (seq-empty? (local remaining))
+        (variant Interchange SeqValue (local values))
+        (recur
+          (seq-rest (local remaining))
+          (seq-append
+            (local values)
+            (call (local revision->interchange)
+                  (seq-first (local remaining))))))))
+
+  (fn page->interchange
+    (params (page Page))
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (variant Interchange
+             MapValue
+             (map-set
+               (map-set
+                 (map-set
+                   (map-empty Interchange)
+                   "title"
+                   (variant Interchange
+                            StringValue
+                            (record-get (local page) title)))
+                 "body"
+                 (variant Interchange
+                          StringValue
+                          (record-get (local page) body)))
+               "revisions"
+               (call (local revisions->interchange)
+                     (record-get (local page) revisions)))))
+
+  (fn pages->interchange
+    (params (wiki Wiki))
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (loop ((remaining (map-keys (record-get (local wiki) pages)))
+           (values (seq-empty Interchange)))
+      (if (seq-empty? (local remaining))
+        (variant Interchange SeqValue (local values))
+        (match (map-get (record-get (local wiki) pages) (seq-first (local remaining)))
+          (case (Some page)
+            (recur
+              (seq-rest (local remaining))
+              (seq-append
+                (local values)
+                (call (local page->interchange) (local page)))))
+          (case None
+            (recur
+              (seq-rest (local remaining))
+              (local values)))))))
+
+  (fn wiki->interchange
+    (params (wiki Wiki))
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (variant Interchange
+             MapValue
+             (map-set
+               (map-empty Interchange)
+               "pages"
+               (call (local pages->interchange) (local wiki)))))
+
+  (fn string-field-result
+    (params (entries (Map String Interchange)) (field String) (detail String))
+    (returns (Result String Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (map-get (local entries) (local field))
+      (case (Some value)
+        (match (local value)
+          (case (StringValue text)
+            (variant (Result String Diagnostic) Ok (local text)))
+          (case _
+            (variant (Result String Diagnostic)
+                     Err
+                     (call (local diagnostic)
+                           "Expected string field."
+                           (local detail))))))
+      (case None
+        (variant (Result String Diagnostic)
+                 Err
+                 (call (local diagnostic)
+                       "Missing field."
+                       (local detail))))))
+
+  (fn revisions-result
+    (params (value Interchange))
+    (returns (Result (Seq Revision) Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (local value)
+      (case (SeqValue values)
+        (loop ((remaining (local values))
+               (revisions (seq-empty Revision)))
+          (if (seq-empty? (local remaining))
+            (variant (Result (Seq Revision) Diagnostic)
+                     Ok
+                     (local revisions))
+            (match (seq-first (local remaining))
+              (case (MapValue entry)
+                (match (call (local string-field-result)
+                             (local entry)
+                             "body"
+                             "revision.body")
+                  (case (Ok body)
+                    (recur
+                      (seq-rest (local remaining))
+                      (seq-append
+                        (local revisions)
+                        (construct Revision (local body)))))
+                  (case (Err diagnostic)
+                    (variant (Result (Seq Revision) Diagnostic)
+                             Err
+                             (local diagnostic)))))
+              (case _
+                (variant (Result (Seq Revision) Diagnostic)
+                         Err
+                         (call (local diagnostic)
+                               "Expected revision object."
+                               "revision")))))))
+      (case _
+        (variant (Result (Seq Revision) Diagnostic)
+                 Err
+                 (call (local diagnostic)
+                       "Expected revisions array."
+                       "page.revisions")))))
+
+  (fn page-result
+    (params (value Interchange))
+    (returns (Result Page Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (local value)
+      (case (MapValue entries)
+        (match (call (local string-field-result) (local entries) "title" "page.title")
+          (case (Ok title)
+            (match (call (local string-field-result) (local entries) "body" "page.body")
+              (case (Ok body)
+                (match (map-get (local entries) "revisions")
+                  (case (Some revisions-value)
+                    (match (call (local revisions-result) (local revisions-value))
+                      (case (Ok revisions)
+                        (variant (Result Page Diagnostic)
+                                 Ok
+                                 (construct Page
+                                            (local title)
+                                            (local body)
+                                            (local revisions))))
+                      (case (Err diagnostic)
+                        (variant (Result Page Diagnostic)
+                                 Err
+                                 (local diagnostic)))))
+                  (case None
+                    (variant (Result Page Diagnostic)
+                             Err
+                             (call (local diagnostic)
+                                   "Missing field."
+                                   "page.revisions")))))
+              (case (Err diagnostic)
+                (variant (Result Page Diagnostic)
+                         Err
+                         (local diagnostic)))))
+          (case (Err diagnostic)
+            (variant (Result Page Diagnostic)
+                     Err
+                     (local diagnostic)))))
+      (case _
+        (variant (Result Page Diagnostic)
+                 Err
+                 (call (local diagnostic)
+                       "Expected page object."
+                       "page")))))
+
+  (fn pages-map-result
+    (params (value Interchange))
+    (returns (Result (Map String Page) Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (local value)
+      (case (SeqValue values)
+        (loop ((remaining (local values))
+               (pages (map-empty Page)))
+          (if (seq-empty? (local remaining))
+            (variant (Result (Map String Page) Diagnostic)
+                     Ok
+                     (local pages))
+            (match (call (local page-result) (seq-first (local remaining)))
+              (case (Ok page)
+                (recur
+                  (seq-rest (local remaining))
+                  (map-set
+                    (local pages)
+                    (record-get (local page) title)
+                    (local page))))
+              (case (Err diagnostic)
+                (variant (Result (Map String Page) Diagnostic)
+                         Err
+                         (local diagnostic))))))
+      (case _
+        (variant (Result (Map String Page) Diagnostic)
+                 Err
+                 (call (local diagnostic)
+                       "Expected pages array."
+                       "wiki.pages")))))
+
+  (fn interchange->wiki-result
+    (params (value Interchange))
+    (returns (Result Wiki Diagnostic))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (local value)
+      (case (MapValue entries)
+        (match (map-get (local entries) "pages")
+          (case (Some pages-value)
+            (match (call (local pages-map-result) (local pages-value))
+              (case (Ok pages)
+                (variant (Result Wiki Diagnostic)
+                         Ok
+                         (construct Wiki (local pages))))
+              (case (Err diagnostic)
+                (variant (Result Wiki Diagnostic)
+                         Err
+                         (local diagnostic)))))
+          (case None
+            (variant (Result Wiki Diagnostic)
+                     Err
+                     (call (local diagnostic)
+                           "Missing pages field."
+                           "wiki.pages")))))
+      (case _
+        (variant (Result Wiki Diagnostic)
+                 Err
+                 (call (local diagnostic)
+                       "Expected wiki object."
+                       "wiki")))))
+
+  (fn save-wiki
+    (params (path String) (wiki Wiki))
+    (returns (Result Bool Diagnostic))
+    (effects (File.Write))
+    (requires true)
+    (ensures true)
+    (match (call (local write-result) (call (local wiki->interchange) (local wiki)))
+      (case (Ok json)
+        (call (local write-string-result) (local path) (local json)))
+      (case (Err diagnostic)
+        (variant (Result Bool Diagnostic)
+                 Err
+                 (local diagnostic)))))
+
+  (fn load-wiki
+    (params (path String))
+    (returns (Result Wiki Diagnostic))
+    (effects (File.Read))
+    (requires true)
+    (ensures true)
+    (match (call (local read-string-result) (local path))
+      (case (Ok text)
+        (match (call (local parse-result) (local text))
+          (case (Ok value)
+            (call (local interchange->wiki-result) (local value)))
+          (case (Err diagnostic)
+            (variant (Result Wiki Diagnostic)
+                     Err
+                     (local diagnostic)))))
+      (case (Err diagnostic)
+        (variant (Result Wiki Diagnostic)
+                 Err
+                 (local diagnostic)))))
+
+  (fn load-wiki-or-default
+    (params (path String) (fallback Wiki))
+    (returns Wiki)
+    (effects (File.Read Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (if (call (local exists?) (local path))
+      (match (call (local load-wiki) (local path))
+        (case (Ok wiki)
+          (local wiki))
+        (case (Err diagnostic)
+          (local fallback)))
+      (local fallback))))

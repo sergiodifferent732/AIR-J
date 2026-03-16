@@ -23,6 +23,7 @@ It now includes both:
 ## Files
 
 - `wiki.airj`: pure in-memory wiki engine
+- `wiki_persistence.airj`: canonical JSON/file persistence for wiki state
 - `wiki_app.airj`: runnable console wiki shell
 - `wiki_server.airj`: runnable HTTP wiki server
 - `wiki_test_suite.airj`: reusable AIR-J wiki acceptance-oriented tests
@@ -56,11 +57,18 @@ java -jar /tmp/wiki-server.jar
 Default address:
 
 - `http://127.0.0.1:8080`
+- default state file: `/tmp/airj-wiki.json`
 
 Optional port:
 
 ```bash
 java -jar /tmp/wiki-server.jar 9090
+```
+
+Optional port and state file:
+
+```bash
+java -jar /tmp/wiki-server.jar 9090 /tmp/airj-wiki-state.json
 ```
 
 Useful routes:
@@ -77,6 +85,14 @@ Quick smoke test:
 ```bash
 curl -L http://127.0.0.1:8080/
 ```
+
+Persistence smoke test:
+
+```bash
+curl -L -d 'title=Home&body=%23%20Persisted' http://127.0.0.1:8080/update
+```
+
+Then restart the server against the same state file and revisit `/view/Home`.
 
 Supported commands:
 
@@ -141,5 +157,5 @@ The AIR-J suite covers the non-HTTP feature slices from the Java example:
 - `wiki_markup.feature`
 
 The intent is not a production web framework. The intent is a faithful AIR-J
-application that proves both the wiki domain behavior and a real internal AIR-J
-page server.
+application that proves the wiki domain behavior, canonical persistence, and a
+real internal AIR-J page server.

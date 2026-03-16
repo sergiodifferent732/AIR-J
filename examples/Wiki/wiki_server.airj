@@ -13,6 +13,7 @@
                         list-titles
                         search-pages
                         history-bodies)
+    (airj example/wiki_persistence save-wiki load-wiki-or-default)
     (java java.net.URLDecoder)
     (java java.net.URLEncoder))
   (export main)
@@ -478,6 +479,16 @@
       (case (Err diagnostic)
         (call (local empty-wiki)))))
 
+  (fn state-path
+    (params (args StringSeq))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (int-ge (seq-length (local args)) 2)
+      (seq-get (local args) 1)
+      "/tmp/airj-wiki.json"))
+
   (fn requested-port
     (params (args StringSeq))
     (returns Int)
@@ -495,16 +506,23 @@
   (fn main
     (params (args StringSeq))
     (returns Int)
-    (effects (Http.Listen Http.Accept Http.Respond Stdout.Write Foreign.Throw))
+    (effects (File.Read File.Write Http.Listen Http.Accept Http.Respond Stdout.Write Foreign.Throw))
     (requires true)
     (ensures true)
-    (let ((server (call (local listen) (call (local requested-port) (local args)))))
+    (let ((server (call (local listen) (call (local requested-port) (local args))))
+          (path (call (local state-path) (local args))))
       (seq
         (io/println
           (string-concat
             "Serving AIR-J Wiki at http://127.0.0.1:"
             (int->string (call (local port) (local server)))))
-        (loop ((wiki (call (local initial-wiki))))
+        (io/println
+          (string-concat
+            "Using wiki state file "
+            (local path)))
+        (loop ((wiki (call (local load-wiki-or-default)
+                           (local path)
+                           (call (local initial-wiki)))))
           (let ((request (call (local accept) (local server))))
             (let ((next (call (local route-request) (local wiki) (local request))))
               (seq
@@ -512,6 +530,18 @@
                       (local server)
                       (local request)
                       (record-get (local next) response))
+                (match (call (local save-wiki)
+                             (local path)
+                             (record-get (local next) nextWiki))
+                  (case (Ok written)
+                    true)
+                  (case (Err diagnostic)
+                    (seq
+                      (io/println
+                        (string-concat
+                          "warning: failed to save wiki state "
+                          (record-get (local diagnostic) detail)))
+                      false)))
                 (if true
                   (recur (record-get (local next) nextWiki))
-                  0))))))))))
+                  0)))))))))

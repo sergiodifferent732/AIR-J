@@ -22,7 +22,11 @@
                         invoke-link
                         create-offer
                         rendered-contains-link?
-                        rendered-indicates-missing-link?))
+                        rendered-indicates-missing-link?)
+    (airj example/wiki_persistence wiki->interchange
+                                    interchange->wiki-result
+                                    save-wiki
+                                    load-wiki))
   (export suite)
 
   (fn titles-joined
@@ -66,6 +70,14 @@
         (local wiki))
       (case (Err diagnostic)
         (call (local empty-wiki)))))
+
+  (fn persistence-path
+    (params)
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    "/tmp/airj-wiki-persistence.json")
 
   (fn creates-a-new-page
     (params)
@@ -690,6 +702,53 @@
               "Expected rendered page."
               (record-get (local diagnostic) detail)))))
 
+  (fn round-trips-through-interchange
+    (params)
+    (returns TestOutcome)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (call (local interchange->wiki-result)
+                 (call (local wiki->interchange)
+                       (call (local wiki-from-home-and-install))))
+      (case (Ok wiki)
+        (call (local assert-bool-eq)
+              "round trips through interchange"
+              (call (local page-exists?) (local wiki) "Install Guide")
+              true))
+      (case (Err diagnostic)
+        (call (local fail)
+              "round trips through interchange"
+              "Expected wiki round trip."
+              (record-get (local diagnostic) detail)))))
+
+  (fn saves-and-loads-wiki
+    (params)
+    (returns TestOutcome)
+    (effects (File.Read File.Write))
+    (requires true)
+    (ensures true)
+    (match (call (local save-wiki)
+                 (call (local persistence-path))
+                 (call (local wiki-from-home-and-install)))
+      (case (Ok written)
+        (match (call (local load-wiki) (call (local persistence-path)))
+          (case (Ok wiki)
+            (call (local assert-bool-eq)
+                  "saves and loads wiki"
+                  (call (local page-exists?) (local wiki) "Home")
+                  true))
+          (case (Err diagnostic)
+            (call (local fail)
+                  "saves and loads wiki"
+                  "Expected persisted wiki."
+                  (record-get (local diagnostic) detail)))))
+      (case (Err diagnostic)
+        (call (local fail)
+              "saves and loads wiki"
+              "Save failed."
+              (record-get (local diagnostic) detail)))))
+
   (fn suite
     (params)
     (returns (Seq TestOutcome))
@@ -739,10 +798,16 @@
             (call (local singleton-test) (call (local renders-emphasis-and-strong-text)))
             (call (local singleton-test) (call (local renders-unordered-lists))))
           (seq-concat
-            (call (local singleton-test)
-                  (call (local renders-wiki-links-inside-markdown)))
-            (call (local singleton-test)
-                  (call (local leaves-unclosed-wiki-link-as-literal-text))))))))
+            (seq-concat
+              (call (local singleton-test)
+                    (call (local renders-wiki-links-inside-markdown)))
+              (call (local singleton-test)
+                    (call (local leaves-unclosed-wiki-link-as-literal-text))))
+            (seq-concat
+              (call (local singleton-test)
+                    (call (local round-trips-through-interchange)))
+              (call (local singleton-test)
+                    (call (local saves-and-loads-wiki)))))))))
 
   (fn singleton-test
     (params (test TestOutcome))
@@ -753,4 +818,3 @@
     (seq-append
       (seq-empty TestOutcome)
       (local test))))
-)
