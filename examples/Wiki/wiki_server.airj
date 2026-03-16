@@ -1,8 +1,9 @@
 (module example/wiki_server
   (imports
-    (airj airj/core Diagnostic Result Option parse-int)
+    (airj airj/core Diagnostic Result Option Interchange parse-int)
     (airj airj/http HttpServer HttpRequest HttpResponse
-                     listen port accept respond html-response)
+                     listen port accept respond close html-response)
+    (airj airj/json write)
     (airj example/wiki Wiki
                         PageView
                         empty-wiki
@@ -13,10 +14,17 @@
                         list-titles
                         search-pages
                         history-bodies)
-    (airj example/wiki_persistence save-wiki load-wiki-or-default)
+    (airj example/wiki_persistence wiki->interchange
+                                   save-wiki
+                                   load-wiki-or-default)
     (java java.net.URLDecoder)
     (java java.net.URLEncoder))
-  (export main)
+  (export start-server
+          current-port
+          initial-state
+          serve-once
+          stop-server
+          main)
 
   (data ServerStep
     (field nextWiki Wiki)
@@ -288,6 +296,64 @@
               "</strong>: "
               (string-concat (record-get (local diagnostic) message) "</p><p><a href=\"/\">Home</a></p>")))))))
 
+  (fn diagnostic->interchange
+    (params (diagnostic Diagnostic))
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (variant Interchange
+             MapValue
+             (map-set
+               (map-set
+                 (map-empty Interchange)
+                 "message"
+                 (variant Interchange StringValue (record-get (local diagnostic) message)))
+               "detail"
+               (variant Interchange StringValue (record-get (local diagnostic) detail)))))
+
+  (fn strings->interchange
+    (params (values (Seq String)))
+    (returns Interchange)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (loop ((remaining (local values))
+           (items (seq-empty Interchange)))
+      (if (seq-empty? (local remaining))
+        (variant Interchange SeqValue (local items))
+        (recur
+          (seq-rest (local remaining))
+          (seq-append
+            (local items)
+            (variant Interchange StringValue (seq-first (local remaining))))))))
+
+  (fn json-response
+    (params (status Int) (body Interchange))
+    (returns HttpResponse)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (construct HttpResponse
+               (local status)
+               "application/json; charset=utf-8"
+               (call (local write) (local body))))
+
+  (fn json-error-response
+    (params (status Int) (diagnostic Diagnostic))
+    (returns HttpResponse)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local json-response)
+          (local status)
+          (variant Interchange
+                   MapValue
+                   (map-set
+                     (map-empty Interchange)
+                     "error"
+                     (call (local diagnostic->interchange) (local diagnostic))))))
+
   (fn page-response
     (params (pageView PageView) (historyItems (Seq String)))
     (returns HttpResponse)
@@ -340,6 +406,69 @@
             (local query)
             (string-concat "</strong></p><ul>" (string-concat (call (local title-links) (local titles)) "</ul>")))))))
 
+  (fn search-json-response
+    (params (query String) (titles (Seq String)))
+    (returns HttpResponse)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call
+      (local json-response)
+      200
+      (variant Interchange
+               MapValue
+               (map-set
+                 (map-set
+                   (map-empty Interchange)
+                   "query"
+                   (variant Interchange StringValue (local query)))
+                 "titles"
+                 (call (local strings->interchange) (local titles))))))
+
+  (fn history-json-response
+    (params (title String) (entries (Seq String)))
+    (returns HttpResponse)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call
+      (local json-response)
+      200
+      (variant Interchange
+               MapValue
+               (map-set
+                 (map-set
+                   (map-empty Interchange)
+                   "title"
+                   (variant Interchange StringValue (local title)))
+                 "history"
+                 (call (local strings->interchange) (local entries))))))
+
+  (fn page-view-json-response
+    (params (pageView PageView) (entries (Seq String)))
+    (returns HttpResponse)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call
+      (local json-response)
+      200
+      (variant Interchange
+               MapValue
+               (map-set
+                 (map-set
+                   (map-set
+                     (map-set
+                       (map-empty Interchange)
+                       "title"
+                       (variant Interchange StringValue (record-get (local pageView) title)))
+                     "body"
+                     (variant Interchange StringValue (record-get (local pageView) body)))
+                   "rendered"
+                   (variant Interchange StringValue (record-get (local pageView) rendered)))
+                 "history"
+                 (call (local strings->interchange) (local entries))))))
+
   (fn step
     (params (nextWiki Wiki) (response HttpResponse))
     (returns ServerStep)
@@ -370,6 +499,63 @@
               (local wiki)
               (call (local diagnostic-response) 404 (local diagnostic))))))
 
+  (fn api-page-step
+    (params (wiki Wiki) (title String))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page) (local wiki) (local title))
+      (case (Ok pageView)
+        (match (call (local history-bodies) (local wiki) (record-get (local pageView) title))
+          (case (Ok entries)
+            (call (local step)
+                  (local wiki)
+                  (call (local page-view-json-response)
+                        (local pageView)
+                        (local entries))))
+          (case (Err diagnostic)
+            (call (local step)
+                  (local wiki)
+                  (call (local json-error-response) 500 (local diagnostic))))))
+      (case (Err diagnostic)
+        (call (local step)
+              (local wiki)
+              (call (local json-error-response) 404 (local diagnostic))))))
+
+  (fn api-history-step
+    (params (wiki Wiki) (title String))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local history-bodies) (local wiki) (local title))
+      (case (Ok entries)
+        (call (local step)
+              (local wiki)
+              (call (local history-json-response) (local title) (local entries))))
+      (case (Err diagnostic)
+        (call (local step)
+              (local wiki)
+              (call (local json-error-response) 404 (local diagnostic))))))
+
+  (fn api-search-step
+    (params (wiki Wiki) (query String))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local search-pages) (local wiki) (local query))
+      (case (Ok titles)
+        (call
+          (local step)
+          (local wiki)
+          (call (local search-json-response) (local query) (local titles))))
+      (case (Err diagnostic)
+        (call (local step)
+              (local wiki)
+              (call (local json-error-response) 400 (local diagnostic))))))
+
   (fn handle-create
     (params (wiki Wiki) (request HttpRequest))
     (returns ServerStep)
@@ -385,6 +571,24 @@
           (call (local step) (local nextWiki) (call (local home-response) (local nextWiki))))
         (case (Err diagnostic)
           (call (local step) (local wiki) (call (local diagnostic-response) 400 (local diagnostic)))))))
+
+  (fn handle-create-json
+    (params (wiki Wiki) (request HttpRequest))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((form (call (local form-pairs) (record-get (local request) body))))
+      (match (call (local create-page)
+                   (local wiki)
+                   (call (local form-value) (local form) "title")
+                   (call (local form-value) (local form) "body"))
+        (case (Ok nextWiki)
+          (call (local api-page-step)
+                (local nextWiki)
+                (call (local form-value) (local form) "title")))
+        (case (Err diagnostic)
+          (call (local step) (local wiki) (call (local json-error-response) 400 (local diagnostic)))))))
 
   (fn handle-update
     (params (wiki Wiki) (request HttpRequest))
@@ -402,6 +606,24 @@
         (case (Err diagnostic)
           (call (local step) (local wiki) (call (local diagnostic-response) 400 (local diagnostic)))))))
 
+  (fn handle-update-json
+    (params (wiki Wiki) (request HttpRequest))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((form (call (local form-pairs) (record-get (local request) body))))
+      (match (call (local update-page)
+                   (local wiki)
+                   (call (local form-value) (local form) "title")
+                   (call (local form-value) (local form) "body"))
+        (case (Ok nextWiki)
+          (call (local api-page-step)
+                (local nextWiki)
+                (call (local form-value) (local form) "title")))
+        (case (Err diagnostic)
+          (call (local step) (local wiki) (call (local json-error-response) 400 (local diagnostic)))))))
+
   (fn handle-delete
     (params (wiki Wiki) (request HttpRequest))
     (returns ServerStep)
@@ -416,6 +638,30 @@
           (call (local step) (local nextWiki) (call (local home-response) (local nextWiki))))
         (case (Err diagnostic)
           (call (local step) (local wiki) (call (local diagnostic-response) 400 (local diagnostic)))))))
+
+  (fn handle-delete-json
+    (params (wiki Wiki) (request HttpRequest))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((form (call (local form-pairs) (record-get (local request) body))))
+      (match (call (local delete-page)
+                   (local wiki)
+                   (call (local form-value) (local form) "title"))
+        (case (Ok nextWiki)
+          (call (local step)
+                (local nextWiki)
+                (call (local json-response)
+                      200
+                      (variant Interchange
+                               MapValue
+                               (map-set
+                                 (map-empty Interchange)
+                                 "wiki"
+                                 (call (local wiki->interchange) (local nextWiki)))))))
+        (case (Err diagnostic)
+          (call (local step) (local wiki) (call (local json-error-response) 400 (local diagnostic)))))))
 
   (fn handle-search
     (params (wiki Wiki) (request HttpRequest))
@@ -436,6 +682,85 @@
         (case (Err diagnostic)
           (call (local step) (local wiki) (call (local diagnostic-response) 400 (local diagnostic)))))))
 
+  (fn not-found-step
+    (params (wiki Wiki))
+    (returns ServerStep)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call
+      (local step)
+      (local wiki)
+      (call
+        (local html-response)
+        404
+        (call (local html-layout) "Not Found" "<p>Not found.</p><p><a href=\"/\">Home</a></p>"))))
+
+  (fn get-route-step
+    (params (wiki Wiki) (path String))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (if (string-eq (local path) "/")
+      (call (local step) (local wiki) (call (local home-response) (local wiki)))
+      (if (string-eq (local path) "/api/wiki")
+        (call (local step)
+              (local wiki)
+              (call (local json-response) 200 (call (local wiki->interchange) (local wiki))))
+        (if (string-eq (local path) "/api/pages")
+          (call (local step)
+                (local wiki)
+                (call
+                  (local json-response)
+                  200
+                  (variant Interchange
+                           MapValue
+                           (map-set
+                             (map-empty Interchange)
+                             "titles"
+                             (call (local strings->interchange)
+                                   (call (local list-titles) (local wiki)))))))
+          (if (call (local starts-with?) (local path) "/api/page/")
+            (call (local api-page-step)
+                  (local wiki)
+                  (call (local url-decode) (call (local drop-prefix) (local path) "/api/page/")))
+            (if (call (local starts-with?) (local path) "/api/history/")
+              (call (local api-history-step)
+                    (local wiki)
+                    (call (local url-decode) (call (local drop-prefix) (local path) "/api/history/")))
+              (if (call (local starts-with?) (local path) "/api/search/")
+                (call (local api-search-step)
+                      (local wiki)
+                      (call (local url-decode) (call (local drop-prefix) (local path) "/api/search/")))
+                (if (call (local starts-with?) (local path) "/view/")
+                  (call (local view-step)
+                        (local wiki)
+                        (call (local url-decode) (call (local drop-prefix) (local path) "/view/")))
+                  (call (local not-found-step) (local wiki))))))))))
+
+  (fn post-route-step
+    (params (wiki Wiki) (path String) (request HttpRequest))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (if (string-eq (local path) "/create")
+      (call (local handle-create) (local wiki) (local request))
+      (if (string-eq (local path) "/update")
+        (call (local handle-update) (local wiki) (local request))
+        (if (string-eq (local path) "/delete")
+          (call (local handle-delete) (local wiki) (local request))
+          (if (string-eq (local path) "/search")
+            (call (local handle-search) (local wiki) (local request))
+            (if (string-eq (local path) "/api/create")
+              (call (local handle-create-json) (local wiki) (local request))
+              (if (string-eq (local path) "/api/update")
+                (call (local handle-update-json) (local wiki) (local request))
+                (if (string-eq (local path) "/api/delete")
+                  (call (local handle-delete-json) (local wiki) (local request))
+                  (call (local not-found-step) (local wiki))))))))))
+
   (fn route-request
     (params (wiki Wiki) (request HttpRequest))
     (returns ServerStep)
@@ -444,28 +769,11 @@
     (ensures true)
     (let ((method (record-get (local request) method))
           (path (record-get (local request) path)))
-      (if (bool-and (string-eq (local method) "GET") (string-eq (local path) "/"))
-        (call (local step) (local wiki) (call (local home-response) (local wiki)))
-        (if (bool-and (string-eq (local method) "GET")
-                      (call (local starts-with?) (local path) "/view/"))
-          (call (local view-step)
-                (local wiki)
-                (call (local url-decode) (call (local drop-prefix) (local path) "/view/")))
-          (if (bool-and (string-eq (local method) "POST") (string-eq (local path) "/create"))
-            (call (local handle-create) (local wiki) (local request))
-            (if (bool-and (string-eq (local method) "POST") (string-eq (local path) "/update"))
-              (call (local handle-update) (local wiki) (local request))
-              (if (bool-and (string-eq (local method) "POST") (string-eq (local path) "/delete"))
-                (call (local handle-delete) (local wiki) (local request))
-                (if (bool-and (string-eq (local method) "POST") (string-eq (local path) "/search"))
-                  (call (local handle-search) (local wiki) (local request))
-                  (call
-                    (local step)
-                    (local wiki)
-                    (call
-                      (local html-response)
-                      404
-                      (call (local html-layout) "Not Found" "<p>Not found.</p><p><a href=\"/\">Home</a></p>")))))))))))
+      (if (string-eq (local method) "GET")
+        (call (local get-route-step) (local wiki) (local path))
+        (if (string-eq (local method) "POST")
+          (call (local post-route-step) (local wiki) (local path) (local request))
+          (call (local not-found-step) (local wiki))))))
 
   (fn initial-wiki
     (params)
@@ -503,26 +811,85 @@
         (case (Err diagnostic)
           8080))))
 
+  (fn start-server
+    (params (args StringSeq))
+    (returns HttpServer)
+    (effects (Http.Listen Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local listen) (call (local requested-port) (local args))))
+
+  (fn current-port
+    (params (server HttpServer))
+    (returns Int)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local port) (local server)))
+
+  (fn initial-state
+    (params (path String))
+    (returns Wiki)
+    (effects (File.Read Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local load-wiki-or-default)
+          (local path)
+          (call (local initial-wiki))))
+
+  (fn serve-once
+    (params (server HttpServer) (wiki Wiki) (path String))
+    (returns Wiki)
+    (effects (File.Write Http.Accept Http.Respond Stdout.Write Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((request (call (local accept) (local server))))
+      (let ((next (call (local route-request) (local wiki) (local request))))
+        (seq
+          (call (local respond)
+                (local server)
+                (local request)
+                (record-get (local next) response))
+          (match (call (local save-wiki)
+                       (local path)
+                       (record-get (local next) nextWiki))
+            (case (Ok written)
+              true)
+            (case (Err diagnostic)
+              (seq
+                (io/println
+                  (string-concat
+                    "warning: failed to save wiki state "
+                    (record-get (local diagnostic) detail)))
+                false)))
+          (record-get (local next) nextWiki)))))
+
+  (fn stop-server
+    (params (server HttpServer))
+    (returns Unit)
+    (effects (Http.Stop Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local close) (local server)))
+
   (fn main
     (params (args StringSeq))
     (returns Int)
     (effects (File.Read File.Write Http.Listen Http.Accept Http.Respond Stdout.Write Foreign.Throw))
     (requires true)
     (ensures true)
-    (let ((server (call (local listen) (call (local requested-port) (local args))))
+    (let ((server (call (local start-server) (local args)))
           (path (call (local state-path) (local args))))
       (seq
         (io/println
           (string-concat
             "Serving AIR-J Wiki at http://127.0.0.1:"
-            (int->string (call (local port) (local server)))))
+            (int->string (call (local current-port) (local server)))))
         (io/println
           (string-concat
             "Using wiki state file "
             (local path)))
-        (loop ((wiki (call (local load-wiki-or-default)
-                           (local path)
-                           (call (local initial-wiki)))))
+        (loop ((wiki (call (local initial-state) (local path))))
           (let ((request (call (local accept) (local server))))
             (let ((next (call (local route-request) (local wiki) (local request))))
               (seq
@@ -544,4 +911,4 @@
                       false)))
                 (if true
                   (recur (record-get (local next) nextWiki))
-                  0)))))))))
+                  0))))))))))

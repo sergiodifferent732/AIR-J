@@ -252,7 +252,7 @@
               (case (Err diagnostic)
                 (variant (Result (Map String Page) Diagnostic)
                          Err
-                         (local diagnostic))))))
+                         (local diagnostic)))))))
       (case _
         (variant (Result (Map String Page) Diagnostic)
                  Err
@@ -314,13 +314,19 @@
     (ensures true)
     (match (call (local read-string-result) (local path))
       (case (Ok text)
-        (match (call (local parse-result) (local text))
-          (case (Ok value)
-            (call (local interchange->wiki-result) (local value)))
-          (case (Err diagnostic)
-            (variant (Result Wiki Diagnostic)
-                     Err
-                     (local diagnostic)))))
+        (if (string-empty? (string-trim (local text)))
+          (variant (Result Wiki Diagnostic)
+                   Err
+                   (call (local diagnostic)
+                         "Empty wiki state."
+                         "wiki"))
+          (match (call (local parse-result) (local text))
+            (case (Ok value)
+              (call (local interchange->wiki-result) (local value)))
+            (case (Err diagnostic)
+              (variant (Result Wiki Diagnostic)
+                       Err
+                       (local diagnostic))))))
       (case (Err diagnostic)
         (variant (Result Wiki Diagnostic)
                  Err
@@ -338,4 +344,4 @@
           (local wiki))
         (case (Err diagnostic)
           (local fallback)))
-      (local fallback))))
+      (local fallback)))))

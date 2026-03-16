@@ -986,6 +986,30 @@
       (should (contains? bundle "airj/core$Diagnostic"))
       (should= 9 (.invoke method nil (object-array [])))))
 
+  (it "compiles helper function names that contain arrows"
+    (let [source "(module example/arrow_names
+                    (imports)
+                    (export main)
+                    (fn value->next
+                      (params (n Int))
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (int-add (local n) 1))
+                    (fn main
+                      (params)
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (call (local value->next) 41)))"
+          bundle (sut/compile-source source)
+          classes (define-classes bundle)
+          klass (get classes "example/arrow_names")
+          method (.getMethod klass "airj_main" (into-array Class []))]
+      (should= 42 (.invoke method nil (object-array [])))))
+
   (it "runs canonical AIR-J file I/O through imported file functions"
     (let [file (.toString (java.nio.file.Files/createTempFile "airj-file-io"
                                                               ".txt"

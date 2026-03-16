@@ -162,4 +162,75 @@
                                                                :pattern {:op :binder-pattern
                                                                          :name 'code}}]}
                                            :body {:op :local :name 'code}}]}}]}]
+      (should= module (sut/check-module module))))
+
+  (it "accepts matches over imported generic union types"
+    (let [module {:name 'example/imported-option-match
+                  :imports [{:op :airj-import
+                             :module 'airj/core
+                             :symbols ['Interchange]}]
+                  :interfaces {'airj/core {:name 'airj/core
+                                           :imports []
+                                           :exports ['Option 'None 'Some 'Interchange]
+                                           :decls [{:op :union
+                                                    :name 'Option
+                                                    :type-params ['T]
+                                                    :invariants []
+                                                    :variants [{:name 'None
+                                                                :fields []}
+                                                               {:name 'Some
+                                                                :fields [{:name 'value
+                                                                          :type 'T}]}]}
+                                                   {:op :union
+                                                    :name 'Interchange
+                                                    :type-params []
+                                                    :invariants []
+                                                    :variants [{:name 'StringValue
+                                                                :fields [{:name 'value
+                                                                          :type 'String}]}
+                                                               {:name 'MapValue
+                                                                :fields [{:name 'entries
+                                                                          :type '(Map String Interchange)}]}]}]}}
+                  :exports ['read]
+                  :decls [{:op :fn
+                           :name 'lookup
+                           :params []
+                           :return-type '(Option Interchange)
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :variant
+                                  :type '(Option Interchange)
+                                  :name 'None
+                                  :args []}}
+                          {:op :fn
+                           :name 'read
+                           :params []
+                           :return-type 'String
+                           :effects []
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :match
+                                  :target {:op :call
+                                           :callee {:op :local :name 'lookup}
+                                           :args []}
+                                  :cases [{:pattern {:op :union-pattern
+                                                     :name 'Some
+                                                     :args [{:op :binder-pattern
+                                                             :name 'value}]}
+                                           :body {:op :match
+                                                  :target {:op :local :name 'value}
+                                                  :cases [{:pattern {:op :union-pattern
+                                                                     :name 'StringValue
+                                                                     :args [{:op :binder-pattern
+                                                                             :name 'text}]}
+                                                           :body {:op :local :name 'text}}
+                                                          {:pattern {:op :union-pattern
+                                                                     :name 'MapValue
+                                                                     :args [{:op :wildcard-pattern}]}
+                                                           :body ""}]}}
+                                          {:pattern {:op :union-pattern
+                                                     :name 'None
+                                                     :args []}
+                                           :body ""}]}}]}]
       (should= module (sut/check-module module)))))

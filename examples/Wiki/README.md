@@ -79,6 +79,14 @@ Useful routes:
 - `POST /update`
 - `POST /delete`
 - `POST /search`
+- `GET /api/wiki`
+- `GET /api/pages`
+- `GET /api/page/<title>`
+- `GET /api/history/<title>`
+- `GET /api/search/<query>`
+- `POST /api/create`
+- `POST /api/update`
+- `POST /api/delete`
 
 Quick smoke test:
 
@@ -93,6 +101,14 @@ curl -L -d 'title=Home&body=%23%20Persisted' http://127.0.0.1:8080/update
 ```
 
 Then restart the server against the same state file and revisit `/view/Home`.
+
+JSON API smoke test:
+
+```bash
+curl -L http://127.0.0.1:8080/api/wiki
+curl -L -d 'title=Home&body=%23%20Updated' http://127.0.0.1:8080/api/update
+curl -L http://127.0.0.1:8080/api/page/Home
+```
 
 Supported commands:
 
@@ -145,6 +161,37 @@ uses the canonical AIR-J test result shape:
 - `failed`
 - `errored`
 - `outcomes`
+
+## Canonical Wiki JSON Schema
+
+The persisted file and `GET /api/wiki` use the same canonical AIR-J shape:
+
+```json
+{
+  "pages": [
+    {
+      "title": "Home",
+      "body": "# Welcome",
+      "revisions": [
+        {"body": "# Welcome"}
+      ]
+    }
+  ]
+}
+```
+
+Additional JSON routes use these shapes:
+
+- `GET /api/pages`
+  - `{"titles":["Home","Install Guide"]}`
+- `GET /api/page/<title>`
+  - `{"title":"Home","body":"# Welcome","rendered":"<h1>Welcome</h1>","history":["# Welcome"]}`
+- `GET /api/history/<title>`
+  - `{"title":"Home","history":["# Welcome","# Updated"]}`
+- `GET /api/search/<query>`
+  - `{"query":"Guide","titles":["Install Guide"]}`
+- error responses
+  - `{"error":{"message":"...","detail":"..."}}`
 
 ## Acceptance Scope Mapped From The Java Wiki
 
