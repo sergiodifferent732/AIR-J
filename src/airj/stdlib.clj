@@ -209,6 +209,87 @@
                                 \"Process execution failed.\"
                                 \"process-run\"))))))"
 
+   'airj/http
+   "(module airj/http
+      (imports
+        (java java.lang.Object))
+      (export HttpServer
+              HttpRequest
+              HttpResponse
+              listen
+              port
+              accept
+              respond
+              close
+              text-response
+              html-response)
+      (data HttpServer
+        (field handle (Java java.lang.Object)))
+      (data HttpRequest
+        (field id Int)
+        (field method String)
+        (field path String)
+        (field body String))
+      (data HttpResponse
+        (field status Int)
+        (field contentType String)
+        (field body String))
+      (fn listen
+        (params (requestedPort Int))
+        (returns HttpServer)
+        (effects (Http.Listen Foreign.Throw))
+        (requires true)
+        (ensures true)
+        (http-listen (local requestedPort)))
+      (fn port
+        (params (server HttpServer))
+        (returns Int)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (http-port (local server)))
+      (fn accept
+        (params (server HttpServer))
+        (returns HttpRequest)
+        (effects (Http.Accept Foreign.Throw))
+        (requires true)
+        (ensures true)
+        (http-accept (local server)))
+      (fn respond
+        (params (server HttpServer) (request HttpRequest) (response HttpResponse))
+        (returns Unit)
+        (effects (Http.Respond Foreign.Throw))
+        (requires true)
+        (ensures true)
+        (http-respond (local server) (local request) (local response)))
+      (fn close
+        (params (server HttpServer))
+        (returns Unit)
+        (effects (Http.Stop Foreign.Throw))
+        (requires true)
+        (ensures true)
+        (http-close (local server)))
+      (fn text-response
+        (params (status Int) (body String))
+        (returns HttpResponse)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (construct HttpResponse
+                   (local status)
+                   \"text/plain; charset=utf-8\"
+                   (local body)))
+      (fn html-response
+        (params (status Int) (body String))
+        (returns HttpResponse)
+        (effects ())
+        (requires true)
+        (ensures true)
+        (construct HttpResponse
+                   (local status)
+                   \"text/html; charset=utf-8\"
+                   (local body))))"
+
    'airj/test
    "(module airj/test
       (imports
@@ -1041,5 +1122,5 @@
       seen)))
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-15T15:58:10.977011-05:00", :module-hash "-1819914036", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 1002, :hash "474291654"} {:id "defn/source-map", :kind "defn", :line 1004, :end-line 1006, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 1008, :end-line 1010, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 1012, :end-line 1014, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 1016, :end-line 1018, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 1020, :end-line 1026, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 1028, :end-line 1041, :hash "-1038087388"}]}
+;; {:version 1, :tested-at "2026-03-16T07:49:04.632959-05:00", :module-hash "-1190911321", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 3, :hash "1849576384"} {:id "form/1/declare", :kind "declare", :line 5, :end-line 5, :hash "-1313016324"} {:id "def/standard-sources", :kind "def", :line 7, :end-line 1083, :hash "-112434303"} {:id "defn/source-map", :kind "defn", :line 1085, :end-line 1087, :hash "981959532"} {:id "defn/interfaces", :kind "defn", :line 1089, :end-line 1091, :hash "801379587"} {:id "defn/interfaces-for-module", :kind "defn", :line 1093, :end-line 1095, :hash "-1218712190"} {:id "defn/stdlib-module?", :kind "defn", :line 1097, :end-line 1099, :hash "1879715354"} {:id "defn-/imported-stdlib-modules", :kind "defn-", :line 1101, :end-line 1107, :hash "667554956"} {:id "defn/reachable-source-map", :kind "defn", :line 1109, :end-line 1122, :hash "-1038087388"}]}
 ;; clj-mutate-manifest-end

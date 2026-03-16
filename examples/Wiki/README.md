@@ -15,13 +15,16 @@ cleanly today:
 - wiki links
 - markdown-like body rendering
 
-It does not attempt to reproduce the Java example's Gherkin pipeline or HTTP
-server in AIR-J.
+It now includes both:
+
+- the pure in-memory wiki engine and AIR-J tests
+- a real in-process AIR-J HTTP server
 
 ## Files
 
 - `wiki.airj`: pure in-memory wiki engine
 - `wiki_app.airj`: runnable console wiki shell
+- `wiki_server.airj`: runnable HTTP wiki server
 - `wiki_test_suite.airj`: reusable AIR-J wiki acceptance-oriented tests
 - `wiki_tests_root.airj`: canonical AIR-J text test root
 - `wiki_tests_json.airj`: canonical AIR-J JSON test root
@@ -36,6 +39,43 @@ clj -M -m airj.cli build --project-dir examples/Wiki --jar /tmp/wiki-app.jar exa
 
 ```bash
 java -jar /tmp/wiki-app.jar
+```
+
+## Build The HTTP Server Jar
+
+```bash
+clj -M -m airj.cli build --project-dir examples/Wiki --jar /tmp/wiki-server.jar example/wiki_server
+```
+
+## Run The HTTP Server
+
+```bash
+java -jar /tmp/wiki-server.jar
+```
+
+Default address:
+
+- `http://127.0.0.1:8080`
+
+Optional port:
+
+```bash
+java -jar /tmp/wiki-server.jar 9090
+```
+
+Useful routes:
+
+- `GET /`
+- `GET /view/<title>`
+- `POST /create`
+- `POST /update`
+- `POST /delete`
+- `POST /search`
+
+Quick smoke test:
+
+```bash
+curl -L http://127.0.0.1:8080/
 ```
 
 Supported commands:
@@ -100,6 +140,6 @@ The AIR-J suite covers the non-HTTP feature slices from the Java example:
 - `wiki_links.feature`
 - `wiki_markup.feature`
 
-The intent is not a browser clone. The intent is a faithful AIR-J domain
-example that proves the same core behaviors as pure AIR-J logic and AIR-J
-tests.
+The intent is not a production web framework. The intent is a faithful AIR-J
+application that proves both the wiki domain behavior and a real internal AIR-J
+page server.

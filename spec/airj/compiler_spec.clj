@@ -165,6 +165,70 @@
       (should= 2 (.invoke snapshot-method instance (object-array [])))
       (should= java.util.ArrayList (.getSuperclass klass))))
 
+  (it "compiles AIR-J HTTP primitives into a working one-shot HTTP server"
+    (let [source "(module example/http_once
+                    (imports
+                      (airj airj/http HttpServer HttpRequest HttpResponse listen accept respond close port text-response))
+                    (export start current-port serve-once stop)
+                    (fn start
+                      (params (requestedPort Int))
+                      (returns HttpServer)
+                      (effects (Http.Listen Foreign.Throw))
+                      (requires true)
+                      (ensures true)
+                      (call (local listen) (local requestedPort)))
+                    (fn current-port
+                      (params (server HttpServer))
+                      (returns Int)
+                      (effects ())
+                      (requires true)
+                      (ensures true)
+                      (call (local port) (local server)))
+                    (fn serve-once
+                      (params (server HttpServer))
+                      (returns String)
+                      (effects (Http.Accept Http.Respond Foreign.Throw))
+                      (requires true)
+                      (ensures true)
+                      (let ((request (call (local accept) (local server))))
+                        (seq
+                          (call (local respond)
+                                (local server)
+                                (local request)
+                                (call (local text-response)
+                                      200
+                                      (record-get (local request) path)))
+                          (record-get (local request) path))))
+                    (fn stop
+                      (params (server HttpServer))
+                      (returns Unit)
+                      (effects (Http.Stop Foreign.Throw))
+                      (requires true)
+                      (ensures true)
+                      (call (local close) (local server))))"
+          bundle (sut/compile-source source)
+          classes (define-classes bundle)
+          klass (get classes "example/http_once")
+          start (.getMethod klass "start" (into-array Class [Integer/TYPE]))
+          current-port (.getMethod klass "current_port" (into-array Class [(get classes "airj/http$HttpServer")]))
+          serve-once (.getMethod klass "serve_once" (into-array Class [(get classes "airj/http$HttpServer")]))
+          stop (.getMethod klass "stop" (into-array Class [(get classes "airj/http$HttpServer")]))
+          server (.invoke start nil (object-array [(int 0)]))
+          actual-port (.invoke current-port nil (object-array [server]))
+          served-path (future (.invoke serve-once nil (object-array [server])))
+          client (java.net.http.HttpClient/newHttpClient)
+          response (.send client
+                          (-> (java.net.http.HttpRequest/newBuilder
+                               (java.net.URI/create
+                                 (str "http://127.0.0.1:" actual-port "/wiki/Home")))
+                              (.GET)
+                              (.build))
+                          (java.net.http.HttpResponse$BodyHandlers/ofString))]
+      (should= 200 (.statusCode response))
+      (should= "/wiki/Home" (.body response))
+      (should= "/wiki/Home" @served-path)
+      (.invoke stop nil (object-array [server]))))
+
   (it "compiles AIR-J source with simple conditionals into executable bytes"
     (let [source "(module example/choose
                     (imports)

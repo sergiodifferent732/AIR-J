@@ -227,6 +227,38 @@
    :root-class-name (types/declared-type-name 'ProcessResult ctx)
    :jvm-type (types/lower-type 'ProcessResult ctx)})
 
+(defn- lower-http-listen
+  [expr ctx]
+  {:op :jvm-http-listen
+   :arg (lower-expr (:arg expr) ctx)
+   :root-class-name (types/declared-type-name 'HttpServer ctx)
+   :jvm-type (types/lower-type 'HttpServer ctx)})
+
+(defn- lower-http-port
+  [expr ctx]
+  {:op :jvm-http-port
+   :arg (lower-expr (:arg expr) ctx)
+   :jvm-type :int})
+
+(defn- lower-http-accept
+  [expr ctx]
+  {:op :jvm-http-accept
+   :arg (lower-expr (:arg expr) ctx)
+   :root-class-name (types/declared-type-name 'HttpRequest ctx)
+   :jvm-type (types/lower-type 'HttpRequest ctx)})
+
+(defn- lower-http-respond
+  [expr ctx]
+  {:op :jvm-http-respond
+   :args (mapv #(lower-expr % ctx) (:args expr))
+   :jvm-type :void})
+
+(defn- lower-http-close
+  [expr ctx]
+  {:op :jvm-http-close
+   :arg (lower-expr (:arg expr) ctx)
+   :jvm-type :void})
+
 (defn- lower-java-call
   [expr ctx]
   {:op :jvm-java-call
@@ -515,6 +547,11 @@
    :json-write lower-json-write
    :env-get lower-env-get
    :process-run lower-process-run
+   :http-listen lower-http-listen
+   :http-port lower-http-port
+   :http-accept lower-http-accept
+   :http-respond lower-http-respond
+   :http-close lower-http-close
    :string->int (fn [expr ctx] (lower-primitive-unary :jvm-string->int expr ctx :int))
    :string-length (fn [expr ctx] (lower-primitive-unary :jvm-string-length expr ctx :int))
    :string-trim (fn [expr ctx] (lower-primitive-unary :jvm-string-trim expr ctx "java/lang/String"))
@@ -583,5 +620,5 @@
    :jvm-type (types/lower-type (:type param) ctx)})
 
 ;; clj-mutate-manifest-begin
-;; {:version 1, :tested-at "2026-03-15T12:18:09.546162-05:00", :module-hash "-198747662", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 5, :hash "-816319332"} {:id "form/1/declare", :kind "declare", :line 7, :end-line 7, :hash "-1588192225"} {:id "form/2/declare", :kind "declare", :line 8, :end-line 8, :hash "-350471521"} {:id "defn-/lower-floating-literal", :kind "defn-", :line 10, :end-line 19, :hash "193702899"} {:id "defn/lower-literal", :kind "defn", :line 21, :end-line 35, :hash "1784475901"} {:id "defn-/local-callee-name", :kind "defn-", :line 37, :end-line 40, :hash "291537367"} {:id "defn-/lower-local", :kind "defn-", :line 42, :end-line 58, :hash "-672533136"} {:id "defn-/lower-construct", :kind "defn-", :line 60, :end-line 66, :hash "756421074"} {:id "defn-/lower-static-call", :kind "defn-", :line 68, :end-line 76, :hash "1812359444"} {:id "defn-/lower-closure-call", :kind "defn-", :line 78, :end-line 87, :hash "1094309029"} {:id "defn-/lower-call", :kind "defn-", :line 89, :end-line 118, :hash "-345196595"} {:id "defn-/lower-variant", :kind "defn-", :line 120, :end-line 129, :hash "-1867821314"} {:id "defn-/lower-record-get", :kind "defn-", :line 131, :end-line 139, :hash "-1351678206"} {:id "defn-/lower-if", :kind "defn-", :line 141, :end-line 147, :hash "-2017247463"} {:id "defn-/lower-seq", :kind "defn-", :line 149, :end-line 164, :hash "1082177207"} {:id "defn-/lower-let", :kind "defn-", :line 166, :end-line 191, :hash "-64431889"} {:id "defn-/lower-java-static-call", :kind "defn-", :line 193, :end-line 201, :hash "-1681813544"} {:id "defn-/lower-json-parse", :kind "defn-", :line 203, :end-line 208, :hash "1797385827"} {:id "defn-/lower-json-write", :kind "defn-", :line 210, :end-line 214, :hash "-446845756"} {:id "defn-/lower-env-get", :kind "defn-", :line 216, :end-line 221, :hash "-1306325642"} {:id "defn-/lower-process-run", :kind "defn-", :line 223, :end-line 228, :hash "-775234508"} {:id "defn-/lower-java-call", :kind "defn-", :line 230, :end-line 238, :hash "-1452735591"} {:id "defn-/lower-java-get-field", :kind "defn-", :line 240, :end-line 246, :hash "2032560028"} {:id "defn-/lower-java-static-get-field", :kind "defn-", :line 248, :end-line 254, :hash "-1037422566"} {:id "defn-/lower-java-set-field", :kind "defn-", :line 256, :end-line 263, :hash "-203168201"} {:id "defn-/lower-java-static-set-field", :kind "defn-", :line 265, :end-line 272, :hash "824180224"} {:id "defn-/lower-java-new", :kind "defn-", :line 274, :end-line 280, :hash "-1502399898"} {:id "defn-/lower-primitive-binary", :kind "defn-", :line 282, :end-line 286, :hash "706056105"} {:id "defn-/lower-primitive-unary", :kind "defn-", :line 288, :end-line 292, :hash "-597151269"} {:id "defn-/lower-seq-unary", :kind "defn-", :line 294, :end-line 297, :hash "104266702"} {:id "defn-/lower-seq-element", :kind "defn-", :line 299, :end-line 302, :hash "298832021"} {:id "defn-/lower-seq-get", :kind "defn-", :line 304, :end-line 308, :hash "-1493025967"} {:id "defn-/lower-seq-empty", :kind "defn-", :line 310, :end-line 314, :hash "-1652178697"} {:id "defn-/lower-seq-append", :kind "defn-", :line 316, :end-line 323, :hash "7405015"} {:id "defn-/lower-map-empty", :kind "defn-", :line 325, :end-line 329, :hash "-600183760"} {:id "defn-/lower-map-set", :kind "defn-", :line 331, :end-line 338, :hash "-1287806141"} {:id "defn-/lower-map-get", :kind "defn-", :line 340, :end-line 351, :hash "1062175272"} {:id "defn-/lower-map-contains", :kind "defn-", :line 353, :end-line 357, :hash "-1954286433"} {:id "defn-/lower-map-keys", :kind "defn-", :line 359, :end-line 363, :hash "-1109401239"} {:id "defn-/lower-lambda", :kind "defn-", :line 365, :end-line 373, :hash "1375267938"} {:id "defn-/lower-var", :kind "defn-", :line 375, :end-line 382, :hash "550518548"} {:id "defn-/lower-set", :kind "defn-", :line 384, :end-line 393, :hash "-1854533276"} {:id "defn-/lower-loop", :kind "defn-", :line 395, :end-line 417, :hash "-2120471898"} {:id "defn-/lower-recur", :kind "defn-", :line 419, :end-line 423, :hash "-613482979"} {:id "defn-/lower-catch-type", :kind "defn-", :line 425, :end-line 430, :hash "828723469"} {:id "defn-/lower-try", :kind "defn-", :line 432, :end-line 446, :hash "2141795572"} {:id "defn-/lower-raise", :kind "defn-", :line 448, :end-line 456, :hash "517260333"} {:id "def/lower-expr-handlers", :kind "def", :line 458, :end-line 570, :hash "-1124180764"} {:id "defn/lower-expr", :kind "defn", :line 572, :end-line 578, :hash "-1590709867"} {:id "defn/lower-param", :kind "defn", :line 580, :end-line 583, :hash "-480161331"}]}
+;; {:version 1, :tested-at "2026-03-16T07:39:21.153044-05:00", :module-hash "898474512", :forms [{:id "form/0/ns", :kind "ns", :line 1, :end-line 5, :hash "-816319332"} {:id "form/1/declare", :kind "declare", :line 7, :end-line 7, :hash "-1588192225"} {:id "form/2/declare", :kind "declare", :line 8, :end-line 8, :hash "-350471521"} {:id "defn-/lower-floating-literal", :kind "defn-", :line 10, :end-line 19, :hash "193702899"} {:id "defn/lower-literal", :kind "defn", :line 21, :end-line 35, :hash "1784475901"} {:id "defn-/local-callee-name", :kind "defn-", :line 37, :end-line 40, :hash "291537367"} {:id "defn-/lower-local", :kind "defn-", :line 42, :end-line 58, :hash "-672533136"} {:id "defn-/lower-construct", :kind "defn-", :line 60, :end-line 66, :hash "756421074"} {:id "defn-/lower-static-call", :kind "defn-", :line 68, :end-line 76, :hash "1812359444"} {:id "defn-/lower-closure-call", :kind "defn-", :line 78, :end-line 87, :hash "1094309029"} {:id "defn-/lower-call", :kind "defn-", :line 89, :end-line 118, :hash "-345196595"} {:id "defn-/lower-variant", :kind "defn-", :line 120, :end-line 129, :hash "-1867821314"} {:id "defn-/lower-record-get", :kind "defn-", :line 131, :end-line 139, :hash "-1351678206"} {:id "defn-/lower-if", :kind "defn-", :line 141, :end-line 147, :hash "-2017247463"} {:id "defn-/lower-seq", :kind "defn-", :line 149, :end-line 164, :hash "1082177207"} {:id "defn-/lower-let", :kind "defn-", :line 166, :end-line 191, :hash "-64431889"} {:id "defn-/lower-java-static-call", :kind "defn-", :line 193, :end-line 201, :hash "-1681813544"} {:id "defn-/lower-json-parse", :kind "defn-", :line 203, :end-line 208, :hash "1797385827"} {:id "defn-/lower-json-write", :kind "defn-", :line 210, :end-line 214, :hash "-446845756"} {:id "defn-/lower-env-get", :kind "defn-", :line 216, :end-line 221, :hash "-1306325642"} {:id "defn-/lower-process-run", :kind "defn-", :line 223, :end-line 228, :hash "-775234508"} {:id "defn-/lower-http-listen", :kind "defn-", :line 230, :end-line 235, :hash "1910727949"} {:id "defn-/lower-http-port", :kind "defn-", :line 237, :end-line 241, :hash "1517574202"} {:id "defn-/lower-http-accept", :kind "defn-", :line 243, :end-line 248, :hash "1209944683"} {:id "defn-/lower-http-respond", :kind "defn-", :line 250, :end-line 254, :hash "1596556850"} {:id "defn-/lower-http-close", :kind "defn-", :line 256, :end-line 260, :hash "101164076"} {:id "defn-/lower-java-call", :kind "defn-", :line 262, :end-line 270, :hash "-1280359825"} {:id "defn-/lower-java-get-field", :kind "defn-", :line 272, :end-line 278, :hash "2032560028"} {:id "defn-/lower-java-static-get-field", :kind "defn-", :line 280, :end-line 286, :hash "-1037422566"} {:id "defn-/lower-java-set-field", :kind "defn-", :line 288, :end-line 295, :hash "-203168201"} {:id "defn-/lower-java-static-set-field", :kind "defn-", :line 297, :end-line 304, :hash "824180224"} {:id "defn-/lower-java-new", :kind "defn-", :line 306, :end-line 312, :hash "-446979918"} {:id "defn-/lower-primitive-binary", :kind "defn-", :line 314, :end-line 318, :hash "-702919570"} {:id "defn-/lower-primitive-unary", :kind "defn-", :line 320, :end-line 324, :hash "-597151269"} {:id "defn-/lower-seq-unary", :kind "defn-", :line 326, :end-line 329, :hash "104266702"} {:id "defn-/lower-seq-element", :kind "defn-", :line 331, :end-line 334, :hash "298832021"} {:id "defn-/lower-seq-get", :kind "defn-", :line 336, :end-line 340, :hash "444264719"} {:id "defn-/lower-seq-empty", :kind "defn-", :line 342, :end-line 346, :hash "-1652178697"} {:id "defn-/lower-seq-append", :kind "defn-", :line 348, :end-line 355, :hash "1977943076"} {:id "defn-/lower-map-empty", :kind "defn-", :line 357, :end-line 361, :hash "-600183760"} {:id "defn-/lower-map-set", :kind "defn-", :line 363, :end-line 370, :hash "-1564824119"} {:id "defn-/lower-map-get", :kind "defn-", :line 372, :end-line 383, :hash "-1167293423"} {:id "defn-/lower-map-contains", :kind "defn-", :line 385, :end-line 389, :hash "-1837629249"} {:id "defn-/lower-map-keys", :kind "defn-", :line 391, :end-line 395, :hash "-1109401239"} {:id "defn-/lower-lambda", :kind "defn-", :line 397, :end-line 405, :hash "1375267938"} {:id "defn-/lower-var", :kind "defn-", :line 407, :end-line 414, :hash "550518548"} {:id "defn-/lower-set", :kind "defn-", :line 416, :end-line 425, :hash "-1854533276"} {:id "defn-/lower-loop", :kind "defn-", :line 427, :end-line 449, :hash "-2120471898"} {:id "defn-/lower-recur", :kind "defn-", :line 451, :end-line 455, :hash "-1065318925"} {:id "defn-/lower-catch-type", :kind "defn-", :line 457, :end-line 462, :hash "828723469"} {:id "defn-/lower-try", :kind "defn-", :line 464, :end-line 478, :hash "2141795572"} {:id "defn-/lower-raise", :kind "defn-", :line 480, :end-line 488, :hash "517260333"} {:id "def/lower-expr-handlers", :kind "def", :line 490, :end-line 607, :hash "2060299636"} {:id "defn/lower-expr", :kind "defn", :line 609, :end-line 615, :hash "-1590709867"} {:id "defn/lower-param", :kind "defn", :line 617, :end-line 620, :hash "-480161331"}]}
 ;; clj-mutate-manifest-end

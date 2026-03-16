@@ -1,0 +1,517 @@
+(module example/wiki_server
+  (imports
+    (airj airj/core Diagnostic Result Option parse-int)
+    (airj airj/http HttpServer HttpRequest HttpResponse
+                     listen port accept respond html-response)
+    (airj example/wiki Wiki
+                        PageView
+                        empty-wiki
+                        create-page
+                        update-page
+                        delete-page
+                        view-page
+                        list-titles
+                        search-pages
+                        history-bodies)
+    (java java.net.URLDecoder)
+    (java java.net.URLEncoder))
+  (export main)
+
+  (data ServerStep
+    (field nextWiki Wiki)
+    (field response HttpResponse))
+
+  (fn singleton-string
+    (params (value String))
+    (returns (Seq String))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (seq-append
+      (seq-empty String)
+      (local value)))
+
+  (fn singleton-title-map
+    (params (key String) (value String))
+    (returns (Map String String))
+    (effects ())
+    (requires true)
+    (ensures true)
+    (map-set
+      (map-empty String)
+      (local key)
+      (local value)))
+
+  (fn prefix-at?
+    (params (text String) (needle String) (textIndex Int) (needleIndex Int))
+    (returns Bool)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (int-eq (local needleIndex) (string-length (local needle)))
+      true
+      (if (int-ge (local textIndex) (string-length (local text)))
+        false
+        (if (string-eq
+              (string-char-at (local text) (local textIndex))
+              (string-char-at (local needle) (local needleIndex)))
+          (call (local prefix-at?)
+                (local text)
+                (local needle)
+                (int-add (local textIndex) 1)
+                (int-add (local needleIndex) 1))
+          false))))
+
+  (fn starts-with?
+    (params (text String) (needle String))
+    (returns Bool)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local prefix-at?) (local text) (local needle) 0 0))
+
+  (fn string-index-of-from
+    (params (text String) (needle String) (index Int))
+    (returns Int)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (int-eq (string-length (local needle)) 0)
+      0
+      (if (int-gt
+            (int-add (local index) (string-length (local needle)))
+            (string-length (local text)))
+        -1
+        (if (call (local prefix-at?)
+                  (local text)
+                  (local needle)
+                  (local index)
+                  0)
+          (local index)
+          (call (local string-index-of-from)
+                (local text)
+                (local needle)
+                (int-add (local index) 1))))))
+
+  (fn string-index-of
+    (params (text String) (needle String))
+    (returns Int)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call (local string-index-of-from) (local text) (local needle) 0))
+
+  (fn drop-prefix
+    (params (text String) (prefix String))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (call (local starts-with?) (local text) (local prefix))
+      (string-substring
+        (local text)
+        (string-length (local prefix))
+        (string-length (local text)))
+      (local text)))
+
+  (fn url-decode
+    (params (text String))
+    (returns String)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (java/static-call
+      java.net.URLDecoder
+      decode
+      (signature (String String) String)
+      (local text)
+      "UTF-8"))
+
+  (fn url-encode
+    (params (text String))
+    (returns String)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (java/static-call
+      java.net.URLEncoder
+      encode
+      (signature (String String) String)
+      (local text)
+      "UTF-8"))
+
+  (fn append-item
+    (params (items (Seq String)) (item String))
+    (returns (Seq String))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (seq-concat (local items) (call (local singleton-string) (local item))))
+
+  (fn form-pairs
+    (params (body String))
+    (returns (Map String String))
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (loop ((remaining (string-split-on (local body) "&"))
+           (result (map-empty String)))
+      (if (seq-empty? (local remaining))
+        (local result)
+        (let ((entry (seq-first (local remaining))))
+          (let ((equalsIndex (call (local string-index-of) (local entry) "=")))
+            (if (int-lt (local equalsIndex) 0)
+              (recur
+                (seq-rest (local remaining))
+                (local result))
+              (recur
+                (seq-rest (local remaining))
+                (map-set
+                  (local result)
+                  (call (local url-decode)
+                        (string-substring (local entry) 0 (local equalsIndex)))
+                  (call (local url-decode)
+                        (string-substring
+                          (local entry)
+                          (int-add (local equalsIndex) 1)
+                          (string-length (local entry))))))))))))
+
+  (fn form-value
+    (params (form (Map String String)) (key String))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (match (map-get (local form) (local key))
+      (case (Some value)
+        (local value))
+      (case None
+        "")))
+
+  (fn html-layout
+    (params (title String) (body String))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (string-concat
+      "<html><head><title>"
+      (string-concat
+        (local title)
+        (string-concat
+          "</title></head><body>"
+          (string-concat
+            "<h1>"
+            (string-concat
+              (local title)
+              (string-concat "</h1>" (string-concat (local body) "</body></html>"))))))))
+
+  (fn title-links
+    (params (titles (Seq String)))
+    (returns String)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (loop ((remaining (local titles))
+           (result ""))
+      (if (seq-empty? (local remaining))
+        (local result)
+        (let ((title (seq-first (local remaining))))
+          (recur
+            (seq-rest (local remaining))
+            (string-concat
+              (local result)
+              (string-concat
+                "<li><a href=\"/view/"
+                (string-concat
+                  (call (local url-encode) (local title))
+                  (string-concat "\">" (string-concat (local title) "</a></li>"))))))))))
+
+  (fn history-html
+    (params (entries (Seq String)))
+    (returns String)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (loop ((remaining (local entries))
+           (result ""))
+      (if (seq-empty? (local remaining))
+        (local result)
+        (recur
+          (seq-rest (local remaining))
+          (string-concat
+            (local result)
+            (string-concat "<li><pre>" (string-concat (seq-first (local remaining)) "</pre></li>")))))))
+
+  (fn home-body
+    (params (wiki Wiki))
+    (returns String)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (string-concat
+      "<p><a href=\"/\">Home</a></p><h2>Pages</h2><ul>"
+      (string-concat
+        (call (local title-links) (call (local list-titles) (local wiki)))
+        (string-concat
+          "</ul><h2>Create Page</h2><form method=\"POST\" action=\"/create\">"
+          (string-concat
+            "<p>Title<br/><input name=\"title\"/></p><p>Body<br/><textarea name=\"body\" rows=\"10\" cols=\"60\"></textarea></p><p><button type=\"submit\">Create</button></p></form>"
+            "<h2>Search</h2><form method=\"POST\" action=\"/search\"><p><input name=\"q\"/><button type=\"submit\">Search</button></p></form>")))))
+
+  (fn home-response
+    (params (wiki Wiki))
+    (returns HttpResponse)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call (local html-response) 200 (call (local html-layout) "AIR-J Wiki" (call (local home-body) (local wiki)))))
+
+  (fn diagnostic-response
+    (params (status Int) (diagnostic Diagnostic))
+    (returns HttpResponse)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (call
+      (local html-response)
+      (local status)
+      (call
+        (local html-layout)
+        "AIR-J Wiki Error"
+        (string-concat
+          "<p><strong>"
+          (string-concat
+            (record-get (local diagnostic) detail)
+            (string-concat
+              "</strong>: "
+              (string-concat (record-get (local diagnostic) message) "</p><p><a href=\"/\">Home</a></p>")))))))
+
+  (fn page-response
+    (params (pageView PageView) (historyItems (Seq String)))
+    (returns HttpResponse)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call
+      (local html-response)
+      200
+      (call
+        (local html-layout)
+        (record-get (local pageView) title)
+        (string-concat
+          "<p><a href=\"/\">Home</a></p><div>"
+          (string-concat
+            (record-get (local pageView) rendered)
+            (string-concat
+              "</div><h2>Edit</h2><form method=\"POST\" action=\"/update\"><input type=\"hidden\" name=\"title\" value=\""
+              (string-concat
+                (record-get (local pageView) title)
+                (string-concat
+                  "\"/><p><textarea name=\"body\" rows=\"10\" cols=\"60\">"
+                  (string-concat
+                    (record-get (local pageView) body)
+                    (string-concat
+                      "</textarea></p><p><button type=\"submit\">Update</button></p></form><form method=\"POST\" action=\"/delete\"><input type=\"hidden\" name=\"title\" value=\""
+                      (string-concat
+                        (record-get (local pageView) title)
+                        (string-concat
+                          "\"/><p><button type=\"submit\">Delete</button></p></form><h2>History</h2><ul>"
+                          (string-concat
+                            (call (local history-html) (local historyItems))
+                            "</ul>")))))))))))))
+
+  (fn search-response
+    (params (query String) (titles (Seq String)))
+    (returns HttpResponse)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (call
+      (local html-response)
+      200
+      (call
+        (local html-layout)
+        "Search"
+        (string-concat
+          "<p><a href=\"/\">Home</a></p><p>Results for <strong>"
+          (string-concat
+            (local query)
+            (string-concat "</strong></p><ul>" (string-concat (call (local title-links) (local titles)) "</ul>")))))))
+
+  (fn step
+    (params (nextWiki Wiki) (response HttpResponse))
+    (returns ServerStep)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (construct ServerStep (local nextWiki) (local response)))
+
+  (fn view-step
+    (params (wiki Wiki) (title String))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local view-page) (local wiki) (local title))
+      (case (Ok pageView)
+        (match (call (local history-bodies) (local wiki) (local title))
+          (case (Ok entries)
+            (call (local step)
+                  (local wiki)
+                  (call (local page-response) (local pageView) (local entries))))
+          (case (Err diagnostic)
+            (call (local step)
+                  (local wiki)
+                  (call (local diagnostic-response) 500 (local diagnostic))))))
+      (case (Err diagnostic)
+        (call (local step)
+              (local wiki)
+              (call (local diagnostic-response) 404 (local diagnostic))))))
+
+  (fn handle-create
+    (params (wiki Wiki) (request HttpRequest))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((form (call (local form-pairs) (record-get (local request) body))))
+      (match (call (local create-page)
+                   (local wiki)
+                   (call (local form-value) (local form) "title")
+                   (call (local form-value) (local form) "body"))
+        (case (Ok nextWiki)
+          (call (local step) (local nextWiki) (call (local home-response) (local nextWiki))))
+        (case (Err diagnostic)
+          (call (local step) (local wiki) (call (local diagnostic-response) 400 (local diagnostic)))))))
+
+  (fn handle-update
+    (params (wiki Wiki) (request HttpRequest))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((form (call (local form-pairs) (record-get (local request) body))))
+      (match (call (local update-page)
+                   (local wiki)
+                   (call (local form-value) (local form) "title")
+                   (call (local form-value) (local form) "body"))
+        (case (Ok nextWiki)
+          (call (local view-step) (local nextWiki) (call (local form-value) (local form) "title")))
+        (case (Err diagnostic)
+          (call (local step) (local wiki) (call (local diagnostic-response) 400 (local diagnostic)))))))
+
+  (fn handle-delete
+    (params (wiki Wiki) (request HttpRequest))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((form (call (local form-pairs) (record-get (local request) body))))
+      (match (call (local delete-page)
+                   (local wiki)
+                   (call (local form-value) (local form) "title"))
+        (case (Ok nextWiki)
+          (call (local step) (local nextWiki) (call (local home-response) (local nextWiki))))
+        (case (Err diagnostic)
+          (call (local step) (local wiki) (call (local diagnostic-response) 400 (local diagnostic)))))))
+
+  (fn handle-search
+    (params (wiki Wiki) (request HttpRequest))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((form (call (local form-pairs) (record-get (local request) body))))
+      (match (call (local search-pages) (local wiki) (call (local form-value) (local form) "q"))
+        (case (Ok titles)
+          (call
+            (local step)
+            (local wiki)
+            (call
+              (local search-response)
+              (call (local form-value) (local form) "q")
+              (local titles))))
+        (case (Err diagnostic)
+          (call (local step) (local wiki) (call (local diagnostic-response) 400 (local diagnostic)))))))
+
+  (fn route-request
+    (params (wiki Wiki) (request HttpRequest))
+    (returns ServerStep)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((method (record-get (local request) method))
+          (path (record-get (local request) path)))
+      (if (bool-and (string-eq (local method) "GET") (string-eq (local path) "/"))
+        (call (local step) (local wiki) (call (local home-response) (local wiki)))
+        (if (bool-and (string-eq (local method) "GET")
+                      (call (local starts-with?) (local path) "/view/"))
+          (call (local view-step)
+                (local wiki)
+                (call (local url-decode) (call (local drop-prefix) (local path) "/view/")))
+          (if (bool-and (string-eq (local method) "POST") (string-eq (local path) "/create"))
+            (call (local handle-create) (local wiki) (local request))
+            (if (bool-and (string-eq (local method) "POST") (string-eq (local path) "/update"))
+              (call (local handle-update) (local wiki) (local request))
+              (if (bool-and (string-eq (local method) "POST") (string-eq (local path) "/delete"))
+                (call (local handle-delete) (local wiki) (local request))
+                (if (bool-and (string-eq (local method) "POST") (string-eq (local path) "/search"))
+                  (call (local handle-search) (local wiki) (local request))
+                  (call
+                    (local step)
+                    (local wiki)
+                    (call
+                      (local html-response)
+                      404
+                      (call (local html-layout) "Not Found" "<p>Not found.</p><p><a href=\"/\">Home</a></p>")))))))))))
+
+  (fn initial-wiki
+    (params)
+    (returns Wiki)
+    (effects (Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (match (call (local create-page) (call (local empty-wiki)) "Home" "# Welcome to AIR-J Wiki")
+      (case (Ok wiki)
+        (local wiki))
+      (case (Err diagnostic)
+        (call (local empty-wiki)))))
+
+  (fn requested-port
+    (params (args StringSeq))
+    (returns Int)
+    (effects ())
+    (requires true)
+    (ensures true)
+    (if (seq-empty? (local args))
+      8080
+      (match (call (local parse-int) (seq-first (local args)))
+        (case (Ok value)
+          (local value))
+        (case (Err diagnostic)
+          8080))))
+
+  (fn main
+    (params (args StringSeq))
+    (returns Int)
+    (effects (Http.Listen Http.Accept Http.Respond Stdout.Write Foreign.Throw))
+    (requires true)
+    (ensures true)
+    (let ((server (call (local listen) (call (local requested-port) (local args)))))
+      (seq
+        (io/println
+          (string-concat
+            "Serving AIR-J Wiki at http://127.0.0.1:"
+            (int->string (call (local port) (local server)))))
+        (loop ((wiki (call (local initial-wiki))))
+          (let ((request (call (local accept) (local server))))
+            (let ((next (call (local route-request) (local wiki) (local request))))
+              (seq
+                (call (local respond)
+                      (local server)
+                      (local request)
+                      (record-get (local next) response))
+                (if true
+                  (recur (record-get (local next) nextWiki))
+                  0))))))))))

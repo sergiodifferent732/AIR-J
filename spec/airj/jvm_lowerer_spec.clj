@@ -313,6 +313,93 @@
                    first
                    :body))))
 
+  (it "lowers HTTP primitives into JVM runtime nodes"
+    (let [module {:name 'example/http_runtime
+                  :imports []
+                  :exports ['run]
+                  :decls [{:op :data
+                           :name 'HttpServer
+                           :type-params []
+                           :invariants []
+                           :fields [{:name 'handle :type '(Java java.lang.Object)}]}
+                          {:op :data
+                           :name 'HttpRequest
+                           :type-params []
+                           :invariants []
+                           :fields [{:name 'id :type 'Int}
+                                    {:name 'method :type 'String}
+                                    {:name 'path :type 'String}
+                                    {:name 'body :type 'String}]}
+                          {:op :data
+                           :name 'HttpResponse
+                           :type-params []
+                           :invariants []
+                           :fields [{:name 'status :type 'Int}
+                                    {:name 'contentType :type 'String}
+                                    {:name 'body :type 'String}]}
+                          {:op :fn
+                           :name 'run
+                           :params [{:name 'port :type 'Int}
+                                    {:name 'server :type 'HttpServer}
+                                    {:name 'request :type 'HttpRequest}
+                                    {:name 'response :type 'HttpResponse}]
+                           :return-type 'Unit
+                           :effects ['Http.Listen 'Http.Accept 'Http.Respond 'Http.Stop]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq
+                                  :exprs [{:op :http-listen
+                                           :arg {:op :local :name 'port}}
+                                          {:op :http-port
+                                           :arg {:op :local :name 'server}}
+                                          {:op :http-accept
+                                           :arg {:op :local :name 'server}}
+                                          {:op :http-respond
+                                           :args [{:op :local :name 'server}
+                                                  {:op :local :name 'request}
+                                                  {:op :local :name 'response}]}
+                                          {:op :http-close
+                                           :arg {:op :local :name 'server}}]}}]}]
+      (should= {:op :jvm-seq
+                :exprs [{:op :jvm-http-listen
+                         :arg {:op :jvm-local
+                               :name 'port
+                               :jvm-type :int}
+                         :root-class-name "example/http_runtime$HttpServer"
+                         :jvm-type "example/http_runtime$HttpServer"}
+                        {:op :jvm-http-port
+                         :arg {:op :jvm-local
+                               :name 'server
+                               :jvm-type "example/http_runtime$HttpServer"}
+                         :jvm-type :int}
+                        {:op :jvm-http-accept
+                         :arg {:op :jvm-local
+                               :name 'server
+                               :jvm-type "example/http_runtime$HttpServer"}
+                         :root-class-name "example/http_runtime$HttpRequest"
+                         :jvm-type "example/http_runtime$HttpRequest"}
+                        {:op :jvm-http-respond
+                         :args [{:op :jvm-local
+                                 :name 'server
+                                 :jvm-type "example/http_runtime$HttpServer"}
+                                {:op :jvm-local
+                                 :name 'request
+                                 :jvm-type "example/http_runtime$HttpRequest"}
+                                {:op :jvm-local
+                                 :name 'response
+                                 :jvm-type "example/http_runtime$HttpResponse"}]
+                         :jvm-type :void}
+                        {:op :jvm-http-close
+                         :arg {:op :jvm-local
+                               :name 'server
+                               :jvm-type "example/http_runtime$HttpServer"}
+                         :jvm-type :void}]
+                :jvm-type :void}
+               (-> (sut/lower-module module)
+                   :methods
+                   first
+                   :body))))
+
   (it "lowers Bool Unit and Java types"
     (let [module {:name 'example/types
                   :imports []

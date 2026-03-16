@@ -332,6 +332,38 @@
                                 :finally 2}]}}
                (-> ast :decls first :body))))
 
+  (it "parses HTTP host primitives"
+    (let [source "(module example/http
+                    (imports)
+                    (export serve)
+                    (fn serve
+                      (params (port Int) (server HttpServer) (request HttpRequest) (response HttpResponse))
+                      (returns Unit)
+                      (effects (Http.Listen Http.Accept Http.Respond Http.Stop))
+                      (requires true)
+                      (ensures true)
+                      (seq
+                        (http-listen (local port))
+                        (http-port (local server))
+                        (http-accept (local server))
+                        (http-respond (local server) (local request) (local response))
+                        (http-close (local server)))))"
+          ast (sut/parse-module source)]
+      (should= {:op :seq
+                :exprs [{:op :http-listen
+                         :arg {:op :local :name 'port}}
+                        {:op :http-port
+                         :arg {:op :local :name 'server}}
+                        {:op :http-accept
+                         :arg {:op :local :name 'server}}
+                        {:op :http-respond
+                         :args [{:op :local :name 'server}
+                                {:op :local :name 'request}
+                                {:op :local :name 'response}]}
+                        {:op :http-close
+                         :arg {:op :local :name 'server}}]}
+               (-> ast :decls first :body))))
+
   (it "parses loop recur raise and richer match patterns"
     (let [source "(module example/looping
                     (imports)

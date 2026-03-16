@@ -1376,3 +1376,54 @@
                                                   {:op :local :name 'stdin}]}]}}]}]
       (should= module
                (sut/check-module module))))
+
+  (it "type-checks canonical host HTTP primitives"
+    (let [module {:name 'example/http_type
+                  :imports []
+                  :exports ['run]
+                  :decls [{:op :data
+                           :name 'HttpServer
+                           :type-params []
+                           :invariants []
+                           :fields [{:name 'handle
+                                     :type '(Java java.lang.Object)}]}
+                          {:op :data
+                           :name 'HttpRequest
+                           :type-params []
+                           :invariants []
+                           :fields [{:name 'id :type 'Int}
+                                    {:name 'method :type 'String}
+                                    {:name 'path :type 'String}
+                                    {:name 'body :type 'String}]}
+                          {:op :data
+                           :name 'HttpResponse
+                           :type-params []
+                           :invariants []
+                           :fields [{:name 'status :type 'Int}
+                                    {:name 'contentType :type 'String}
+                                    {:name 'body :type 'String}]}
+                          {:op :fn
+                           :name 'run
+                           :params [{:name 'port :type 'Int}
+                                    {:name 'server :type 'HttpServer}
+                                    {:name 'request :type 'HttpRequest}
+                                    {:name 'response :type 'HttpResponse}]
+                           :return-type 'Unit
+                           :effects ['Http.Listen 'Http.Accept 'Http.Respond 'Http.Stop]
+                           :requires [true]
+                           :ensures [true]
+                           :body {:op :seq
+                                  :exprs [{:op :http-listen
+                                           :arg {:op :local :name 'port}}
+                                          {:op :http-port
+                                           :arg {:op :local :name 'server}}
+                                          {:op :http-accept
+                                           :arg {:op :local :name 'server}}
+                                          {:op :http-respond
+                                           :args [{:op :local :name 'server}
+                                                  {:op :local :name 'request}
+                                                  {:op :local :name 'response}]}
+                                          {:op :http-close
+                                           :arg {:op :local :name 'server}}]}}]}]
+      (should= module
+               (sut/check-module module))))
